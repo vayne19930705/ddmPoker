@@ -21,7 +21,7 @@ public class NNCardUtil extends BaseLog {
 	public String CardName_BoomNiu = "s_t_n";
 	// �廨ţ
 	public String CardName_FlowerNiu = "s_h_n";
-	// ţţ
+	// ţţ c_a_n_19 c_a_n_29
 	public String CardName_NiuNiu = "c_a_n";
 	// ţ9-ţ1 c_9_n- c_1_n
 	public String CardName_NiuPoint = "c_%s_n";
@@ -359,7 +359,7 @@ public class NNCardUtil extends BaseLog {
 			index3 = existNumber(cards, jokerIDList);
 			if (index3 != null) // ţx
 			{
-				cardInfo.cardName = CardName_NiuPoint;
+				cardInfo.cardName = String.format(CardName_NiuPoint, 9);
 				for (int i : index3) {
 					cardInfo.endCardIDList.add(i);
 				}
