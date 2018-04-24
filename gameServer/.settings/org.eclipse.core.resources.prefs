@@ -1,0 +1,7 @@
+eclipse.preferences.version=1
+encoding//src/business/global/mj/MJBaseUtil.java=UTF-8
+encoding//src/business/global/mjcard/MJCard.java=UTF-8
+encoding//src/business/global/poker/Poker.java=UTF-8
+encoding//src/business/global/poker/PokerDefine.java=UTF-8
+encoding//src/core/game/poker_nn/NNPointCardInfo.java=UTF-8
+encoding//src/core/game/poker_sss/SSSPointCardInfo.java=UTF-8
