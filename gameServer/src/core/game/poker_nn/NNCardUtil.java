@@ -2,32 +2,42 @@ package core.game.poker_nn;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Hashtable;
 import java.util.List;
+
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils.Collections;
 
 import business.global.log.BaseLog;
 import business.global.poker.Poker;
 import business.global.poker.PokerManager;
+import sun.net.www.content.audio.x_aiff;
 
 public class NNCardUtil extends BaseLog {
 
 	// 特殊牌名-牌面值("1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d",
 	// "s", "w")_maxStringValueCardID
 
-	// 各种牌型对应牌型名字符串:
-
-	// 五小牛 s_x_n
-	public String CardName_FiveLittleNiu = "s_x_n";
+	// 各种牌型对应牌型名字符串:（字符Unicode编码越大，其优先级越高）
+	// 第一位:表示特殊牌还是普通牌（s：特殊牌 c：普通牌） 
+	// 第二位:表示牌型的优先级（特殊牌：z：五小牛 y：炸弹牛 x：五花牛      普通牌：z：牛牛  1-9：牛X 0：无牛 ）
+	// 第三位：表示最大单张牌面值（1-9 ：1-9 a-d：10-K s：小鬼  w：大鬼）
+	// 第四位：表示最大单张的花色（0:大鬼	0：小鬼	4：黑桃	3：红桃	2：梅花	1：方块）
+	// 单张牌面+花色 用一个%s输入
+	
+	// 五小牛
+	public String CardName_FiveLittleNiu = "sz%s";
 	// 四炸
-	public String CardName_BoomNiu = "s_t_n";
+	public String CardName_BoomNiu = "sy%s";
 	// 五花牛
-	public String CardName_FlowerNiu = "s_h_n";
-	// 牛牛 c_a_n_19 c_a_n_29
-	public String CardName_NiuNiu = "c_a_n";
-	// 牛9-牛1 c_9_n- c_1_n
-	public String CardName_NiuPoint = "c_%s_n";
+	public String CardName_FlowerNiu = "sx%s";
+	// 牛牛
+	public String CardName_NiuNiu = "cz%s";
+	// 牛x
+	public String CardName_NiuPoint = "c%s%s";
 	// 无牛
-	public String CardName_NotNiu = "c_0_n";
-
+	public String CardName_NotNiu = "c0%s";
+ 
 	private static NNCardUtil instance = new NNCardUtil();
 
 	public PokerManager pokerManager = null;
@@ -116,8 +126,12 @@ public class NNCardUtil extends BaseLog {
 		int sumPoint = 0;
 		Boolean isLessThanFive = true;
 		Boolean isFiveLittleNiu = false;
-
+		String maxStringValueColor = "";
 		for (Poker poker : cards) {
+			if( poker.stringValueColor.compareTo(maxStringValueColor) > 0 )
+			{
+				maxStringValueColor = poker.stringValueColor;
+			}
 			if (jokerIDList.contains(poker.id)) {
 				sumPoint++; // 此时，默认鬼牌牌面值为1
 				continue;
@@ -140,96 +154,88 @@ public class NNCardUtil extends BaseLog {
 
 		if (isFiveLittleNiu) // 如果是五小牛，返回牌的类型信息 & 排序后的ID信息
 		{
-			cardInfo.cardName = CardName_FiveLittleNiu;
-			cardInfo.endCardIDList.addAll(allCardIDList);
-			cardInfo.endCardIDList.sort((x, y) -> {
-				if (jokerIDList.contains(x) && jokerIDList.contains(y)) // 两张鬼牌
-				{
-					return y - x;
-				} else if (jokerIDList.contains(x) || jokerIDList.contains(y)) // 一张鬼牌
-				{
-					return y - x;
-				} else if (x % 100 == y % 100) // 牌面值相等
-				{
-					return y - x;
-				} else // 牌面值不等
-				{
-					return y % 100 - x % 100;
-				}
-
-			});
+			String cardName = String.format(CardName_FiveLittleNiu, maxStringValueColor);
+			cardInfo.cardName = cardName;
+			List<Integer> sortedCardIDList = new ArrayList<>();
+			sortedCardIDList = getSortedCardIDList(cards);
+			cardInfo.endCardIDList.addAll(sortedCardIDList);
+		}else{
+			cardInfo = null;
 		}
 
-		return null;
+		return cardInfo;
 	}
 
 	// 四炸
 	public NNPointCardInfo s2_BoomNiu(List<Poker> cards, List<Integer> allCardIDList, List<Integer> jokerIDList) {
 
 		NNPointCardInfo cardInfo = new NNPointCardInfo();
-		Boolean isBoomNiu = false;
-		int sumSame = 0;
-		int sumJoker = 0;
-		int sameValue = 0;
-
-		List<Poker> jokerPokerList = new ArrayList<>();
-		List<Poker> commonPokerList = new ArrayList<>();
-
-		for (Poker poker : cards) // 统计鬼牌数
+		
+		Hashtable<Integer, List<Integer>> sumSameHashTable = new Hashtable<>();
+		List<Integer> existJokerList = new ArrayList<>();
+		List<Integer> endCardIDList = new ArrayList<>();
+		String maxStringValueColor = "";
+		
+		for( Poker poker : cards)
 		{
-			if (jokerIDList.contains(poker.id)) {
-				sumJoker++; // 鬼牌数+1
+			if( poker.stringValueColor.compareTo(maxStringValueColor) >0 ) //获取单张最大牌面值及花色
+			{
+				maxStringValueColor = poker.stringValueColor;
 			}
-		}
-
-		// 判断是否是炸弹牛
-		for (int i = 0; i < cards.size() - 2; i++) {
-			if (jokerIDList.contains(cards.get(i).id)) // 如果是鬼牌，跳过
+			if( jokerIDList.contains( poker.id ) )
+			{
+				existJokerList.add(poker.id);
 				continue;
-			for (int j = i + 1; j < cards.size() - 1; j++) // 否则，遍历后续牌，检查相同牌的数量
-			{
-				if (jokerIDList.contains(cards.get(i).id)) // 如果是鬼牌，跳过
-				{
-					continue;
-				} else if (cards.get(i).value == cards.get(j).value) {
-					sumSame++;
-				}
 			}
-			if ((sumJoker + sumSame) >= 4) // 如果是炸弹牛，跳出循环
+			if( !sumSameHashTable.contains(poker.value))
 			{
-				isBoomNiu = true;
-				sameValue = cards.get(i).value;
+				sumSameHashTable.put(poker.value , new ArrayList<>());
+			}
+			
+			List<Integer> cardIDList = sumSameHashTable.get(poker.value);
+			cardIDList.add(poker.id);
+		}
+		
+		for(List<Integer> cardIDList : sumSameHashTable.values())
+		{
+			if( cardIDList.size() + existJokerList.size() >= 4)
+			{
+				//直接排序
+				cardIDList.sort(( x , y )-> 
+				{
+					return y-x;
+				});
+				endCardIDList.addAll(cardIDList);
+				
+				//加入鬼牌（如果有的话）
+				existJokerList.sort(( x, y)->
+				{
+					return y-x;
+				}); 
+				endCardIDList.addAll(existJokerList);
 				break;
-			} else // 不是炸弹牛，sumSame置零，继续统计
-			{
-				sumSame = 0;
 			}
 		}
-
-		if (isBoomNiu) {
-			cardInfo.cardName = CardName_BoomNiu;
-			Integer[] temp = allCardIDList.toArray(new Integer[allCardIDList.size()]);
-			for (int i = 0; i < temp.length; i++) // 找出唯一一张不同的牌，将其放置到最后一张牌的位置
+		
+		//如果是炸弹牛，追加剩余牌，并设置返回信息，否则，设置返回值为null
+		if( endCardIDList.size() == 0)
+		{
+			endCardIDList = null;
+		}else
+		{
+			for(int id : allCardIDList)
 			{
-				if (jokerIDList.contains(temp[i])) // 如果是鬼牌，跳过
-					continue;
-				if (sameValue != temp[i] % 100) // 不是鬼牌，继续判断其位置
+				if(!endCardIDList.contains(id))
 				{
-					if (i == temp.length - 1) // 不是鬼牌，但已经在最后一张牌的位置，则什么都不做，跳出循环
-					{
-						break;
-					} else // 不是鬼牌，且不在最后一张的位置，将其放置到最后一张牌，其原本的位置放置sameValue
-					{
-						temp[temp.length - 1] = temp[i];
-						temp[i] = sameValue;
-					}
+					endCardIDList.add(id);
 				}
 			}
-			for (int i = 0; i < temp.length; i++) {
-				cardInfo.endCardIDList.add(temp[i]);
-			}
+			
+			String cardName = String.format(CardName_BoomNiu, maxStringValueColor);
+			cardInfo.cardName = cardName;
+			cardInfo.endCardIDList.addAll(endCardIDList);
 		}
-
+		
 		return cardInfo;
 
 	}
@@ -239,8 +245,13 @@ public class NNCardUtil extends BaseLog {
 
 		NNPointCardInfo cardInfo = new NNPointCardInfo();
 		Boolean isFlowerNiu = true;
+		String maxStringValueColor = "";
 
 		for (Poker poker : cards) {
+			if( poker.stringValueColor.compareTo(maxStringValueColor) > 0)
+			{
+				maxStringValueColor = poker.stringValueColor;
+			}
 			if (jokerIDList.contains(poker.id)) {
 				continue;
 			} else if (poker.value < 11) {
@@ -250,24 +261,12 @@ public class NNCardUtil extends BaseLog {
 		}
 
 		if (isFlowerNiu) {
-			cardInfo.cardName = CardName_FlowerNiu;
-			cardInfo.endCardIDList.addAll(allCardIDList);
-			cardInfo.endCardIDList.sort((x, y) -> {
-				if (jokerIDList.contains(x) && jokerIDList.contains(y)) // 两张鬼牌
-				{
-					return y - x;
-				} else if (jokerIDList.contains(x) || jokerIDList.contains(y)) // 一张鬼牌
-				{
-					return y - x;
-				} else if (x % 100 == y % 100) // 牌面值相等
-				{
-					return y - x;
-				} else // 牌面值不等
-				{
-					return y % 100 - x % 100;
-				}
-
-			});
+			String cardName = String.format(CardName_FlowerNiu, maxStringValueColor);
+			cardInfo.cardName = cardName;
+			List<Integer> endCardIDList = getSortedCardIDList(cards);
+			cardInfo.endCardIDList.addAll(endCardIDList);
+		}else{
+			cardInfo = null;
 		}
 
 		return cardInfo;
@@ -277,215 +276,311 @@ public class NNCardUtil extends BaseLog {
 	public NNPointCardInfo c1_point(List<Poker> cards, List<Integer> allCardIDList, List<Integer> jokerIDList) {
 
 		NNPointCardInfo cardInfo = new NNPointCardInfo();
-		int sumJoker = 0;
-
-		for (Poker poker : cards) // 统计鬼牌张数
+		
+		List<Poker> jokerPokerList = new ArrayList<>();
+		List<Poker> commonPokerList = new ArrayList<>();
+		String maxStringValueColor = "";
+		int niuPoint = 0;
+		
+		for( Poker poker : cards)
 		{
-			if (jokerIDList.contains(poker.id)) {
-				sumJoker++;
+			if( poker.stringValueColor.compareTo(maxStringValueColor) > 0)
+			{
+				maxStringValueColor = poker.stringValueColor;
+			}
+			if( jokerIDList.contains(poker.id))
+			{
+				jokerPokerList.add(poker);
+			}else
+			{
+				commonPokerList.add(poker);
 			}
 		}
-
-		if (sumJoker == 2) // 2张鬼牌，必定为牛牛，直接输出队列。前三张有一张鬼牌，后两张有一张鬼牌，作为输出队列
+		
+		//两张鬼牌，必定为牛牛
+		if( jokerPokerList.size() == 2 )
 		{
-			cardInfo.cardName = CardName_NiuNiu;
-			Integer[] tempList = allCardIDList.toArray(new Integer[allCardIDList.size()]);
-			int count = 0;
-			for (int i = 0; i < tempList.length; i++) // 第1张和第四张为鬼牌，其余随意
+			List<Poker> niuPokerList = new ArrayList<>();
+			List<Poker> leftPokerList = new ArrayList<>();
+			
+			for( int index = 0; index < commonPokerList.size(); index++)
 			{
-				if (jokerIDList.contains(tempList[i])) {
-					if (count == 0) {
-						if (i < 3) {
-							continue;
-						} else {
-							int tempa = tempList[i];
-							tempList[i] = tempList[0];
-							tempList[0] = tempa;
-						}
-						count++;
-					} else {
-						if (i >= 3) {
-							continue;
-						} else {
-							int tempa = tempList[i];
-							tempList[i] = tempList[3];
-							tempList[3] = tempa;
-						}
-					}
+				if( index == 2)
+				{
+					leftPokerList.add( commonPokerList.get(index));
+				}else
+				{
+					niuPokerList.add( commonPokerList.get(index));
 				}
-
 			}
-
-			for (int i = 0; i < tempList.length; i++) {
-				cardInfo.endCardIDList.add(tempList[i]);
-			}
-
-		} else if (sumJoker == 1) // 1张鬼牌，可能为牛牛，也可能为牛X
+			niuPokerList.add(jokerPokerList.get(0));
+			leftPokerList.add(jokerPokerList.get(1));
+			
+			//设置返回值
+			String cardName = String.format(CardName_NiuNiu, maxStringValueColor);
+			cardInfo.cardName = cardName;
+			
+			List<Integer> endCardIDList = new ArrayList<>();
+			endCardIDList = getSortedCardIDList(niuPokerList);
+			endCardIDList.addAll(getSortedCardIDList(leftPokerList));
+			cardInfo.endCardIDList = endCardIDList;
+			
+		}
+		//一张鬼牌，存在满足条件的三张牌则为牛牛，否则如果存在满足条件的两张牌，为牛牛，否则为牛X
+		else if(jokerPokerList.size() == 1)
 		{
-			int[] index3 = new int[3];
-			index3 = existNumber(cards, jokerIDList);
-			if (index3 != null) // 牛牛
+			List<Poker> niuPokerList = new ArrayList<>();
+			List<Poker> leftPokerList = new ArrayList<>();
+			
+			List<Integer> niuCardIDList = getNiuCardIDList(commonPokerList);
+			List<Integer> endCardIDList = new ArrayList<>();
+			if( niuCardIDList != null )//存在满足条件的三张牌
 			{
-				cardInfo.cardName = CardName_NiuNiu;
-				for (int i : index3) {
-					cardInfo.endCardIDList.add(i);
-				}
-				for (int j : allCardIDList) {
-					if (cardInfo.endCardIDList.contains(j)) {
-						continue;
-					} else {
-						cardInfo.endCardIDList.add(j);
+				for(Poker poker : cards)
+				{
+					if( niuCardIDList.contains( poker.id))
+					{
+						niuPokerList.add(poker);
+					}else
+					{
+						leftPokerList.add(poker);
 					}
 				}
-
-			} else // 牛X
+				
+				endCardIDList = getSortedCardIDList(niuPokerList);
+				endCardIDList.addAll(getSortedCardIDList(leftPokerList));
+				
+				String cardName = String.format(CardName_NiuNiu, maxStringValueColor);
+				cardInfo.cardName = cardName;
+				cardInfo.endCardIDList = endCardIDList;
+			}else //存在满足条件的两张牌，为牛牛，否则为牛X
 			{
-				int[] index2 = new int[2];
-				index2 = maxNiu(cards, jokerIDList);
-				if (index2 != null) {
-					cardInfo.cardName = CardName_NiuPoint;
-					for (int i : allCardIDList) {
-						if (i != index2[0] && i != index2[1]) {
-							cardInfo.endCardIDList.add(i);
-						}
-					}
-					cardInfo.endCardIDList.add(index2[0]);
-					cardInfo.endCardIDList.add(index2[1]);
-				}
-			}
-
-		} else if (sumJoker == 0) {
-			int[] index3 = new int[3];
-			index3 = existNumber(cards, jokerIDList);
-			if (index3 != null) // 牛x
-			{
-				cardInfo.cardName = String.format(CardName_NiuPoint, 9);
-				for (int i : index3) {
-					cardInfo.endCardIDList.add(i);
-				}
-				for (int j : allCardIDList) {
-					if (cardInfo.endCardIDList.contains(j)) {
-						continue;
-					} else {
-						cardInfo.endCardIDList.add(j);
+				List<Integer> leftCardIDList = getMaxPointIDList(commonPokerList);
+				
+				for(Poker poker : cards)
+				{
+					if( !leftCardIDList.contains( poker.id))
+					{
+						niuPokerList.add(poker);
+					}else
+					{
+						leftPokerList.add(poker);
 					}
 				}
+				
+				endCardIDList = getSortedCardIDList(niuPokerList);
+				endCardIDList.addAll(getSortedCardIDList(leftPokerList));
+				
+				String cardName = "";
+				if(leftCardIDList.get(2) == 10)
+				{
+					cardName = String.format(CardName_NiuNiu, maxStringValueColor);
+				}else
+				{
+					cardName = String.format(CardName_NiuPoint, leftCardIDList.get(2), maxStringValueColor);
+				}
+				cardInfo.cardName = cardName;
+				cardInfo.endCardIDList = endCardIDList;
+					
 
-			} else // 无牛
-			{
-				cardInfo.cardName = CardName_NotNiu;
-				cardInfo.endCardIDList.addAll(allCardIDList);
 			}
 		}
+		//没有鬼牌，存在满足条件的三张牌则为牛牛，或者牛X，否则为无牛
+		else
+		{
+			List<Poker> niuPokerList = new ArrayList<>();
+			List<Poker> leftPokerList = new ArrayList<>();
+			
+			List<Integer> niuCardIDList = getNiuCardIDList(commonPokerList);
+			List<Integer> endCardIDList = new ArrayList<>();
+			if( niuCardIDList != null )//存在满足条件的三张牌
+			{
+				for(Poker poker : cards)
+				{
+					if( niuCardIDList.contains( poker.id))
+					{
+						niuPokerList.add(poker);
+					}else
+					{
+						leftPokerList.add(poker);
+					}
+				}
+				
+				endCardIDList = getSortedCardIDList(niuPokerList);
+				endCardIDList.addAll(getSortedCardIDList(leftPokerList));
+				//判断是牛牛还是牛X
+				Poker poker1 = leftPokerList.get(0);
+				Poker poker2 = leftPokerList.get(1);
+				
+				int sumPoint = 0;
+				int maxPoint = 0;
+				
+				if(poker1.value >= 10){
+					sumPoint += 10;
+				}
+				else{
+					sumPoint += poker1.value;
+				}
+				
+				if(poker2.value >= 10){
+					sumPoint += 10;
+				}
+				else{
+					sumPoint += poker2.value;
+				}
+				
+				maxPoint = sumPoint%10;
+				String cardName = "";
+				if( maxPoint == 10 )
+				{
+					cardName = String.format(CardName_NiuNiu, maxStringValueColor);
+				}else
+				{
+					cardName = String.format(CardName_NiuPoint, maxPoint, maxStringValueColor);
+				}
+
+				cardInfo.cardName = cardName;
+				cardInfo.endCardIDList = endCardIDList;
+			}else //无牛
+			{
+				String cardName = String.format(CardName_NotNiu, maxStringValueColor);
+				endCardIDList.addAll(getSortedCardIDList(cards));
+				
+				cardInfo.cardName = cardName;
+				cardInfo.endCardIDList = endCardIDList;
+			}
+		}
+	
+	
 		return cardInfo;
 
 	}
-
-	public int[] existNumber(List<Poker> cards, List<Integer> jokerIDList) {
-		int[] index = { -1, -1, -1 };
-		int sumPoint3 = 0; // 3张牌的点数之和
-		int[] tempValue = new int[cards.size()]; // 临时牌面数组
-		int i = 0;
-		for (Poker poker : cards) {
-			tempValue[i++] = poker.value;
-		}
-
-		for (int j = 0; j < tempValue.length - 2; j++) // 寻找点数和为10的倍数的3张牌
+	//从队列中选出 和的个位数最大的 两张牌，并将它们的和的个位数 放在返回队列的最后一个位置
+	public List<Integer> getMaxPointIDList(List<Poker> commonPokerList)
+	{
+		List<Integer> maxPointIDList = new ArrayList<>();
+		int maxPoint = 0;
+		
+		for( int index1 = 0; index1 < commonPokerList.size(); index1++)
 		{
-			if (jokerIDList.contains(cards.get(j).id)) {
-				continue;
-			}
-			for (int m = j + 1; m < tempValue.length - 1; m++) {
-				if (jokerIDList.contains(cards.get(m).id)) {
-					continue;
+			Poker poker1 = commonPokerList.get(index1);
+			int pokerID1 = poker1.id;
+			
+			for( int index2 = index1+1; index2 < commonPokerList.size()-1; index2++)
+			{
+				Poker poker2 = commonPokerList.get(index2);
+				int pokerID2 = poker2.id;
+				
+				int sumValue = 0;
+				
+				if(poker1.value >= 10){
+					sumValue += 10;
 				}
-				for (int n = m + 1; n < tempValue.length; n++) {
-					if (jokerIDList.contains(cards.get(n).id)) {
-						continue;
-					} else {
-						// j
-						if (tempValue[j] < 11) {
-							sumPoint3 += tempValue[j];
-						} else {
-							sumPoint3 += 10;
-						}
-						// m
-						if (tempValue[m] < 11) {
-							sumPoint3 += tempValue[m];
-						} else {
-							sumPoint3 += 10;
-						}
-						// n
-						if (tempValue[n] < 11) {
-							sumPoint3 += tempValue[n];
-						} else {
-							sumPoint3 += 10;
-						}
-					}
-
-					if (sumPoint3 % 10 == 0) // 如果存在3张牌，其牌面值之和为10的倍数，则记录下i。
-					{
-						index[0] = cards.get(j).id;
-						index[1] = cards.get(m).id;
-						index[2] = cards.get(n).id;
-					} else {
-						sumPoint3 = 0;
-					}
+				else{
+					sumValue += poker1.value;
 				}
-			}
-		}
-		if (index[0] == -1) // 不存在，则返回null
-			index = null;
-		return index;
-
-	}
-
-	public int[] maxNiu(List<Poker> cards, List<Integer> jokerIDList) {
-		int[] index = { -1, -1 };
-		int maxNiu = 0;
-		int sumPoint2 = 0; // 2张牌的点数之和
-		int[] tempValue = new int[cards.size()]; // 临时牌面数组
-		int i = 0;
-		for (Poker poker : cards) {
-			tempValue[i++] = poker.value;
-		}
-		for (int m = 0; m < tempValue.length - 1; m++) {
-			if (jokerIDList.contains(cards.get(m).id)) {
-				continue;
-			}
-			for (int n = m + 1; n < tempValue.length; n++) {
-				if (jokerIDList.contains(cards.get(n).id)) {
-					continue;
-				} else {
-					// m
-					if (tempValue[m] < 11) {
-						sumPoint2 += tempValue[m];
-					} else {
-						sumPoint2 += 10;
-					}
-					// n
-					if (tempValue[n] < 11) {
-						sumPoint2 += tempValue[n];
-					} else {
-						sumPoint2 += 10;
-					}
+				
+				if(poker2.value >= 10){
+					sumValue += 10;
 				}
-
-				if (sumPoint2 % 10 > maxNiu) // 寻找最大牛X
+				else{
+					sumValue += poker2.value;
+				}
+				
+				if( sumValue%10 == 0)
 				{
-					maxNiu = sumPoint2 % 10;
-					index[0] = cards.get(m).id;
-					index[1] = cards.get(n).id;
-				} else {
-					sumPoint2 = 0;
+					maxPoint = 10;
+					maxPointIDList = Arrays.asList( pokerID1, pokerID2, maxPoint);
+					break;
+				} 
+				if( sumValue%10 > maxPoint)
+				{
+					maxPoint = sumValue%10;
+					maxPointIDList = Arrays.asList( pokerID1, pokerID2, maxPoint);
+				}		
+				
+			}
+					
+		}
+			
+		return maxPointIDList;
+	}
+	public List<Integer> getNiuCardIDList(List<Poker> commonPokerList)
+	{
+		List<Integer> niuCardIDList = new ArrayList<>();
+		
+		for( int index1 = 0; index1 < commonPokerList.size(); index1++)
+		{
+			Poker poker1 = commonPokerList.get(index1);
+			int pokerID1 = poker1.id;
+			
+			for( int index2 = index1+1; index2 < commonPokerList.size()-1; index2++)
+			{
+				Poker poker2 = commonPokerList.get(index2);
+				int pokerID2 = poker2.id;
+				
+				for( int index3 = index2+1; index3 < commonPokerList.size()-2; index3++)
+				{
+					Poker poker3 = commonPokerList.get(index3);
+					int pokerID3 = poker3.id;
+					
+					int sumValue = 0;
+					if(poker1.value >= 10){
+						sumValue += 10;
+					}
+					else{
+						sumValue += poker1.value;
+					}
+					
+					if(poker2.value >= 10){
+						sumValue += 10;
+					}
+					else{
+						sumValue += poker2.value;
+					}
+					
+					if(poker3.value >= 10){
+						sumValue += 10;
+					}
+					else{
+						sumValue += poker3.value;
+					}
+						
+					if( sumValue%10 == 0)
+					{
+						niuCardIDList = Arrays.asList( pokerID1, pokerID2, pokerID3);
+						
+					}		
 				}
 			}
+					
 		}
-		if (index[0] == -1) {
-			index = null;
+		
+		if( niuCardIDList.size() == 0)
+		{
+			niuCardIDList = null;
 		}
+		
+		return niuCardIDList;
+	}
+	
+	
+	public List<Integer> getSortedCardIDList( List<Poker> cards )
+	{
+		cards.sort(( first , second )->
+		{
+			return first.stringValueColor.compareTo( second.stringValueColor );
+		});
+		
+		List<Integer> sortedCardIDList = new ArrayList<>();
+		for( Poker poker : cards )
+		{
+			sortedCardIDList.add(poker.id);
+		}
+		
 
-		return index;
+		
+		return sortedCardIDList;
 	}
 
 }
