@@ -9,6 +9,7 @@ import business.global.log.BaseLog;
 import business.global.poker.HandPokerColorInfo;
 import business.global.poker.HandPokerInfo;
 import business.global.poker.HandPokerValueInfo;
+import business.global.poker.Poker;
 import business.global.poker.PokerManager;
 
 public class SSSPokerCardUtil extends BaseLog{
@@ -487,5 +488,42 @@ public class SSSPokerCardUtil extends BaseLog{
 	public SSSSpecailCardInfo s_03_BaXianGuoHai(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
 		
 		return null;
+	}
+	
+	
+	//获取顺子的字符串形式  showCardIDList：默认顺序是  A K Q J 10，...2    
+	public String getShunZiSSSDaoStringValue(List<Integer> showCardIDList) {
+
+		List<Integer> tempShowIDList = new ArrayList<>(showCardIDList);
+
+		int lastCardID = tempShowIDList.get(showCardIDList.size() - 1);
+		Poker lastPoker = this.pokerManager.getPokerByCardID(lastCardID);
+
+		// 如果是5,4,3,2,1 是第2大,把1放到第一位
+		if (lastPoker.value == 1) {
+			tempShowIDList.remove(showCardIDList.size() - 1);
+			tempShowIDList.add(0, lastCardID);
+		}
+
+		return this.getSSSDaoStringValue(tempShowIDList);
+	}
+
+	// 获取某到牌的 字符串形式
+	// cardIDList:指定牌组,排序过的牌
+	public String getSSSDaoStringValue(List<Integer> cardIDList) {
+		String ret = "";
+		int count = cardIDList.size();
+		for (int index = 0; index < count; index++) {
+			int cardID = cardIDList.get(index);
+
+			// 如果传递0 是移除2,3,4,5后山寨替换的一张cardID
+			if (cardID == 0) {
+				ret += "0";
+				continue;
+			}
+			Poker poker = this.pokerManager.getPokerByCardID(cardID);
+			ret += poker.getStringValue();
+		}
+		return ret;
 	}
 }
