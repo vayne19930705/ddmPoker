@@ -1,0 +1,758 @@
+﻿//1.	至尊青龙：A—K清一色顺子。
+	public SSSSpecailCardInfo s_19_ZhiZunQingLong(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		//如果一种颜色 十三张
+		if(color2CardInfo.size() == 1 &&  value2CardInfo.size() == 13){
+			SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+			
+			//A--K
+			this.pokerManager.sortCardIDListMaxK(cardIDList, true);
+			
+			specailCardInfo.cardName = this.CardName_ZhiZunQingLong;
+			specailCardInfo.point = point;
+			specailCardInfo.cardIDList = cardIDList;
+			return specailCardInfo;
+		}
+		
+		return null;
+	}
+	
+	//2.	一条龙：A—K顺子。
+	public SSSSpecailCardInfo s_18_YiTiaoLong(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+				
+		//如果 十三张
+		if(value2CardInfo.size() == 13){
+			SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+			
+			//A--K
+			this.pokerManager.sortCardIDListMaxK(cardIDList, true);
+			
+			specailCardInfo.cardName = this.CardName_YiTiaoLong;
+			specailCardInfo.point = point;
+			specailCardInfo.cardIDList = cardIDList;
+			return specailCardInfo;
+		}			
+		
+		return null;
+	}
+	
+	//3.	三同花顺：头道、中道、尾道皆可配出同花顺牌型。   
+	public SSSSpecailCardInfo s_17_SanTongHuaShun(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		SSSSpecailCardInfo specailTongHuaCardInfo = this.s_08_SanTongHua(point, cardIDList, color2CardInfo, value2CardInfo);
+		//如果不是3同花,跳出
+		if(specailTongHuaCardInfo == null){
+			return null;
+		}
+		
+		List<Integer> firstCardIDList = new ArrayList<>();
+		List<Integer> secondCardIDList = new ArrayList<>();
+		List<Integer> thirdCardIDList = new ArrayList<>();
+		
+		List<Integer> handJokerCardIDList = new ArrayList<>();
+		
+		List<Integer> colorList = new ArrayList<>(color2CardInfo.keySet());
+		
+		int colorCount = colorList.size();
+		
+		for(int index=0; index<colorCount; index++){
+			int color = colorList.get(index);
+			HandPokerColorInfo colorInfo = color2CardInfo.get(color);
+			
+			List<Integer> colorCardIDList = colorInfo.cardIDList;
+			
+			int cardCount = colorCardIDList.size();
+			
+			HandPokerInfo colorHandPokerInfo = this.pokerManager.getHandInfo(colorCardIDList, handJokerCardIDList);
+			
+			if(cardCount == 3){
+				//当前3张是否可以组成顺子
+				PokerGroupCardInfo firstGroupCardInfo = this.getHandMaxShunZiCardIDList(colorCardIDList, colorHandPokerInfo.value2CardInfo, handJokerCardIDList, 3);
+				if(firstGroupCardInfo == null){
+					return null;
+				}
+				firstCardIDList = firstGroupCardInfo.srcCardIDList;
+			}
+			else if(cardCount == 5){
+				//当前5张是否可以组成顺子
+				PokerGroupCardInfo tempGroupCardInfo = this.getHandMaxShunZiCardIDList(colorCardIDList, colorHandPokerInfo.value2CardInfo, handJokerCardIDList, 5);
+				if(tempGroupCardInfo == null){
+					return null;
+				}
+				if(secondCardIDList.size() == 0){
+					secondCardIDList = tempGroupCardInfo.srcCardIDList;
+				}
+				else{
+					thirdCardIDList = tempGroupCardInfo.srcCardIDList;
+				}
+			}
+			else if(cardCount == 8){
+				//当前8张是否可以组成2个顺子
+				List<Integer> endCardIDList = this.getTwoShunZiCardIDList(colorCardIDList);
+				if(endCardIDList.size() == 0){
+					return null;
+				}
+				firstCardIDList = new ArrayList<>(endCardIDList.subList(0, 3));
+				if(secondCardIDList.size() == 0){
+					secondCardIDList = new ArrayList<>(endCardIDList.subList(3, 8));
+				}
+				else{
+					thirdCardIDList = new ArrayList<>(endCardIDList.subList(3, 8));
+				}
+			}
+			else if(cardCount == 13){
+				//当前3张是否可以组成3顺子
+				List<Integer> endCardIDList = this.getSanShunZiCardIDList(colorCardIDList);				
+				if(endCardIDList.size() == 0){
+					return null;
+				}
+				firstCardIDList = new ArrayList<>(endCardIDList.subList(0, 3));
+				secondCardIDList = new ArrayList<>(endCardIDList.subList(3, 8));
+				thirdCardIDList = new ArrayList<>(endCardIDList.subList(8, 13));
+			}
+		}
+		
+		
+		if(firstCardIDList.size() + secondCardIDList.size() + thirdCardIDList.size() != 13){
+			return null;
+		}
+	
+		String secondString = this.getShunZiSSSDaoStringValue(secondCardIDList);
+		String thirdString = this.getShunZiSSSDaoStringValue(thirdCardIDList);
+		
+		if(secondString.compareTo(thirdString) > 0){
+			firstCardIDList.addAll(thirdCardIDList);
+			firstCardIDList.addAll(secondCardIDList);			
+		}
+		else{
+			firstCardIDList.addAll(secondCardIDList);
+			firstCardIDList.addAll(thirdCardIDList);
+		}
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_SanTongHuaShun;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = firstCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	
+
+	
+	//4.	三分天下：三组铁支和任意单牌。
+	public SSSSpecailCardInfo s_16_SanFenTianXia(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+			
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		//排序从A开始查找
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> endCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			List<Integer> valueCardIDList = new ArrayList<>(valueInfo.cardIDList);
+			
+			//可能有多张4条
+			while (valueCardIDList.size() >= 4) {
+				
+				List<Integer> sitiaoList = new ArrayList<>(valueCardIDList.subList(0, 4));
+				endCardIDList.addAll(sitiaoList);				
+
+				this.removeCardByCardIDList(valueCardIDList, sitiaoList);
+			}			
+		}
+		
+		//如果没有找到3组4条跳出
+		if(endCardIDList.size() != 12){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		//删除所有的4条
+		this.removeCardByCardIDList(tempCardIDList, endCardIDList);
+		
+		//倒序,大的3条在后面
+		Collections.reverse(endCardIDList);
+		
+		//追加剩余的一张牌
+		endCardIDList.addAll(tempCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_SanFenTianXia;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = endCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	
+	//10.	四套三条：拥有四组三条，赢每家6分。
+	public SSSSpecailCardInfo s_15_SiTaoSanTiao(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		//排序从A开始筛选
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> endCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			List<Integer> valueCardIDList = new ArrayList<>(valueInfo.cardIDList);
+			
+			//可能有多张3条
+			while (valueCardIDList.size() >= 3) {
+				
+				List<Integer> santiaoList = new ArrayList<>(valueCardIDList.subList(0, 3));
+				endCardIDList.addAll(santiaoList);
+	
+				this.removeCardByCardIDList(valueCardIDList, santiaoList);
+			}
+		}
+		
+		//如果没有找到4租3条跳出
+		if(endCardIDList.size() != 12){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		//删除所有的4条
+		this.removeCardByCardIDList(tempCardIDList, endCardIDList);
+		
+		//大的铁支放后面
+		Collections.reverse(endCardIDList);
+		
+		//追加剩余的一张牌
+		endCardIDList.addAll(tempCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_SiTaoSanTiao;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = endCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//2个5同，1个三条
+	public SSSSpecailCardInfo s_14_SanHuangWuDi(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		//牌型从A开始筛选
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> endCardIDList = new ArrayList<>();
+		
+		List<Integer> firstCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			List<Integer> valueCardIDList = new ArrayList<>(valueInfo.cardIDList);
+			
+			int valueCount = valueCardIDList.size();
+			
+			if(valueCount == 3){
+				firstCardIDList = valueCardIDList;
+			}
+			else if(valueCount == 5){
+				endCardIDList.addAll(valueCardIDList);
+			}
+			else if(valueCount == 8 || valueCount == 13){
+				firstCardIDList = new ArrayList<>(valueCardIDList.subList(0, 3));
+				
+				this.removeCardByCardIDList(valueCardIDList, firstCardIDList);
+				
+				endCardIDList.addAll(valueCardIDList);
+			}
+			else{
+				return null;
+			}
+		}
+		
+		if(firstCardIDList.size() + endCardIDList.size() != 13){
+			return null;
+		}
+		
+		//排序 大的5同在后面
+		this.pokerManager.sortCardIDListMaxA(endCardIDList, true);
+		
+		//3条放前面
+		firstCardIDList.addAll(endCardIDList);
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_SanHuangWuDi;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = firstCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//13张都是J-Q-K-A，赢每家24分。
+	public SSSSpecailCardInfo s_13_ShiErHuangZu(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			
+			//小于11并且不是1的 找到就不满足跳出
+			if(value < 11 && value != 1){
+				return null;
+			}
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		
+		//排序 2 -J Q K A
+		this.pokerManager.sortCardIDListMaxA(tempCardIDList, true);
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_ShiErHuangZu;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = tempCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//十三张牌数字都为8~A，赢每家10分。
+	public SSSSpecailCardInfo s_12_QuanDa(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);	
+		
+		int count = tempCardIDList.size();
+		
+		for (int index = 0; index < count; index++){
+			int cardID = tempCardIDList.get(index);
+			
+			Poker poker = this.pokerManager.getPokerByCardID(cardID);			
+			//如果小于8 并且不等于1
+			if (poker.value < 8 && poker.value != 1){
+				return null;
+			}			
+		}
+		
+		//按value排序 A-K
+		this.pokerManager.sortCardIDListMaxK(tempCardIDList, true);
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		
+		specailCardInfo.cardName = CardName_QuanDa;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = tempCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//十三张牌数字都为2~8，赢每家10分。
+	public SSSSpecailCardInfo s_11_QuanXiao(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);	
+		
+		int count = tempCardIDList.size();
+		
+		for (int index = 0; index < count; index++){
+			int cardID = tempCardIDList.get(index);
+			
+			Poker poker = this.pokerManager.getPokerByCardID(cardID);			
+			//如果大于8  或者等于1 跳出
+			if (poker.value > 8 || poker.value == 1){
+				return null;
+			}			
+		}
+		
+		//按value排序 A-K
+		this.pokerManager.sortCardIDListMaxK(tempCardIDList, true);
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		
+		specailCardInfo.cardName = CardName_QuanXiao;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = tempCardIDList;
+		
+		return specailCardInfo;
+	}
+
+	//9.	凑一色：十三张牌都是红色（方块/红心）或黑色（梅花/黑桃），赢每家10分。
+	public SSSSpecailCardInfo s_10_CouYiSe(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		List<Integer> colorList = new ArrayList<>(color2CardInfo.keySet());
+
+		//如果都是黑色
+		if(PokerDefine.blackColorList.containsAll(colorList)){
+			
+		}
+		//都是红色
+		else if(PokerDefine.redColorList.containsAll(colorList)){
+			
+		}
+		else{
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);	
+		//按value排序 A-K
+		this.pokerManager.sortCardIDListMaxK(tempCardIDList, true);
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		
+		specailCardInfo.cardName = CardName_CouYiSe;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = tempCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//11.	五对冲三：拥有5个对子和一个三条，赢每家5分。
+	public SSSSpecailCardInfo s_09_WuDuiChongSan(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+				
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		//从A开始筛选
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> endCardIDList = new ArrayList<>();
+		List<Integer> endValueList = new ArrayList<>();
+		List<List<Integer>> endDuiZiList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			List<Integer> valueCardIDList = new ArrayList<>(valueInfo.cardIDList);
+			
+			//可能有多张3条
+			while (valueCardIDList.size() >= 2) {
+				
+				List<Integer> duiziList = new ArrayList<>(valueCardIDList.subList(0, 2));
+				endCardIDList.addAll(duiziList);
+				
+					
+				this.removeCardByCardIDList(valueCardIDList, duiziList);
+				
+				endValueList.add(value);
+				endDuiZiList.add(duiziList);
+			}
+		}
+		
+		//如果没有找到6租对子跳出
+		if(endCardIDList.size() != 12){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		//删除所有的4条	
+		this.removeCardByCardIDList(tempCardIDList, endCardIDList);
+		
+		int leftCardID = tempCardIDList.get(0);
+		
+		Poker leftPoker = this.pokerManager.getPokerByCardID(leftCardID);
+		
+		int findDuiZiIndex = endValueList.indexOf(leftPoker.value);		
+		//如果在6对中找到的 剩余的这张牌一样的对子,才能组合3条
+		if(findDuiZiIndex == -1){
+			return null;
+		}
+		List<Integer> duiziList = endDuiZiList.get(findDuiZiIndex);
+		
+		//删除掉对子
+		this.removeCardByCardIDList(endCardIDList, duiziList);
+		
+		//追加第3张牌 构成3条
+		duiziList.add(leftCardID);
+		
+		//排序大的对子排序在后面
+		Collections.reverse(endCardIDList);
+		
+		//3条 后面 追加 5个对子
+		duiziList.addAll(endCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_WuDuiChongSan;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = duiziList;
+		
+		return specailCardInfo;
+	}
+	
+	//14.	三同花：头道、中道、尾道皆可配出同花牌型，赢每家5分。
+	public SSSSpecailCardInfo s_08_SanTongHua(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		List<Integer> colorList = new ArrayList<>(color2CardInfo.keySet());
+		
+		int colorCount = colorList.size();		
+		if(colorCount > 3){
+			return null;
+		}
+		
+		List<Integer> firstCardIDList = new ArrayList<>();
+		
+		List<Integer> findCardIDList = new ArrayList<>();
+		
+		for(int index=0; index<colorCount;index++){
+			int color = colorList.get(index);
+			HandPokerColorInfo colorInfo = color2CardInfo.get(color);
+			List<Integer> colorCardIDList = new ArrayList<>(colorInfo.cardIDList);
+			
+			int cardCount = colorCardIDList.size();
+			
+			if(cardCount == 3){
+				firstCardIDList = colorCardIDList;
+			}
+			else if(cardCount == 5){
+				findCardIDList.addAll(colorCardIDList);
+			}
+			else if(cardCount == 8 || cardCount == 13){
+				firstCardIDList = new ArrayList<>(colorCardIDList.subList(0, 3));
+				
+				//删除掉前3张
+				this.removeCardByCardIDList(colorCardIDList, firstCardIDList);
+				
+				findCardIDList.addAll(colorCardIDList);
+			}
+			else{
+				return null;
+			}			
+		}
+		
+		//没有找到瞒住的
+		if(firstCardIDList.size() + findCardIDList.size() != 13){
+			return null;
+		}
+		
+		List<Integer> secondCardIDList = new ArrayList<>(findCardIDList.subList(0, 5));
+		List<Integer> thirdCardIDList = new ArrayList<>(findCardIDList.subList(5, 10));
+		
+		//A-K-2
+		this.pokerManager.sortCardIDListMaxA(firstCardIDList, false);
+		this.pokerManager.sortCardIDListMaxA(secondCardIDList, false);
+		this.pokerManager.sortCardIDListMaxA(thirdCardIDList, false);
+		
+		List<Integer> endCardIDList = new ArrayList<>();
+		//头道同花
+		endCardIDList.addAll(firstCardIDList);
+		
+		String secondString = this.getSSSDaoStringValue(secondCardIDList);
+		String thirdString = this.getSSSDaoStringValue(thirdCardIDList);
+		
+		if(secondString.compareTo(thirdString) > 0){
+			endCardIDList.addAll(thirdCardIDList);
+			endCardIDList.addAll(secondCardIDList);
+		}
+		else{
+			endCardIDList.addAll(secondCardIDList);
+			endCardIDList.addAll(thirdCardIDList);
+		}
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_SanTongHua;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = endCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//13.	三顺子：头道、中道、尾道皆可配出顺子牌型，赢每家5分。
+	public SSSSpecailCardInfo s_07_SanShunZi(int point, List<Integer>cardIDList){
+		
+		List<Integer> endCardIDList = this.getSanShunZiCardIDList(cardIDList);
+		if(endCardIDList.size() == 0){
+			return null;
+		}
+		
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_SanShunZi;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = endCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+
+		
+	//12.	六对半：13张牌中拥有6张对牌，赢每家5分。
+	public SSSSpecailCardInfo s_06_LiuDuiBan(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> endCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			List<Integer> valueCardIDList = new ArrayList<>(valueInfo.cardIDList);
+			
+			//可能有多张3条
+			while (valueCardIDList.size() >= 2) {
+				
+				List<Integer> duiziList = new ArrayList<>(valueCardIDList.subList(0, 2));
+				endCardIDList.addAll(duiziList);
+				
+				//删除对子
+				this.removeCardByCardIDList(valueCardIDList, duiziList);
+			}
+		}
+		
+		//如果没有找到6租对子跳出
+		if(endCardIDList.size() != 12){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		//删除所有的4条
+		this.removeCardByCardIDList(tempCardIDList, endCardIDList);
+	
+		//排序大的对子排序在后面
+		Collections.reverse(endCardIDList);
+				
+		//追加最后1张牌
+		endCardIDList.addAll(tempCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_LiuDuiBan;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = endCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//6.	六六大顺：有6张一样的牌，赢每家20分。
+	public SSSSpecailCardInfo s_05_LiuLiuDaShun(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> srcCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			
+			if(valueInfo.cardIDList.size() >= 6){
+				srcCardIDList = new ArrayList<>(valueInfo.cardIDList.subList(0, 6));
+				break;
+			}
+		}
+		
+		if(srcCardIDList.size() == 0){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		
+		this.removeCardByCardIDList(tempCardIDList, srcCardIDList);
+		
+		this.pokerManager.sortCardIDListMaxK(tempCardIDList, true);
+		
+		srcCardIDList.addAll(tempCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_LiuLiuDaShun;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = srcCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//6.	北斗七星：有7张一样的牌，赢每家20分。
+	public SSSSpecailCardInfo s_04_BeiDouQiXing(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> srcCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			
+			if(valueInfo.cardIDList.size() >= 7){
+				srcCardIDList = new ArrayList<>(valueInfo.cardIDList.subList(0, 7));
+				break;
+			}
+		}
+		
+		if(srcCardIDList.size() == 0){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		
+		this.removeCardByCardIDList(tempCardIDList, srcCardIDList);
+		
+		this.pokerManager.sortCardIDListMaxK(tempCardIDList, true);
+		
+		srcCardIDList.addAll(tempCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_BeiDouQiXing;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = srcCardIDList;
+		
+		return specailCardInfo;
+	}
+	
+	//6.	八仙过海：有8张一样的牌，赢每家20分。
+	public SSSSpecailCardInfo s_03_BaXianGuoHai(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		
+		this.pokerManager.sortCardValueList(valueList);		
+		
+		List<Integer> srcCardIDList = new ArrayList<>();
+		
+		int count = valueList.size();
+		
+		for(int index=0; index<count; index++){
+			int value = valueList.get(index);
+			
+			HandPokerValueInfo valueInfo = value2CardInfo.get(value);
+			
+			if(valueInfo.cardIDList.size() >= 8){
+				srcCardIDList = new ArrayList<>(valueInfo.cardIDList.subList(0, 8));
+				break;
+			}
+		}
+		
+		if(srcCardIDList.size() == 0){
+			return null;
+		}
+		
+		List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+		
+		this.removeCardByCardIDList(tempCardIDList, srcCardIDList);
+		
+		this.pokerManager.sortCardIDListMaxK(tempCardIDList, true);
+		
+		srcCardIDList.addAll(tempCardIDList);		
+		 
+		SSSSpecailCardInfo specailCardInfo = new SSSSpecailCardInfo();
+		specailCardInfo.cardName = CardName_BaXianGuoHai;
+		specailCardInfo.point = point;
+		specailCardInfo.cardIDList = srcCardIDList;
+		
+		return specailCardInfo;
+	}
+
+
+
+

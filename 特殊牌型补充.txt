@@ -1,0 +1,165 @@
+//找8张牌的2个顺子
+  public List<Integer> getTwoShunZiCardIDList(List<Integer> cardIDList){
+    List<Integer> firstCardIDList = new ArrayList<>();
+    List<Integer> secondCardIDList = new ArrayList<>();
+    
+    //特殊牌型没有鬼牌
+    List<Integer> handJokerCardIDList = new ArrayList<>();
+    
+    //找出13张所有可能的顺子组合
+    List<PokerGroupCardInfo> allShunZiCardInfoList = this.getHandValueAllShunZiCardInfo(cardIDList, 5, handJokerCardIDList);
+    
+    int shunziCount1 = allShunZiCardInfoList.size();
+    //从大到小
+    for(int index1=0; index1<shunziCount1; index1++){
+
+      PokerGroupCardInfo shunziGroupInfo1 = allShunZiCardInfoList.get(index1);
+      
+      //移除已经使用掉的5张卡牌
+      List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+      this.removeCardByCardIDList(tempCardIDList, shunziGroupInfo1.srcCardIDList);
+      
+      //判断最后3张是否是顺子
+      HandPokerInfo handPokerInfo3 = this.pokerManager.getHandInfo(tempCardIDList, handJokerCardIDList);
+      PokerGroupCardInfo groupCardInfo = this.getHandMaxShunZiCardIDList(tempCardIDList, handPokerInfo3.value2CardInfo, handJokerCardIDList, 3);        
+      if(groupCardInfo == null){
+        continue;
+      }
+      
+      //找到一个 3张牌顺子
+      firstCardIDList = groupCardInfo.srcCardIDList;        
+      secondCardIDList = shunziGroupInfo1.srcCardIDList;
+      break;
+    
+    }
+    
+    //没有找到
+    if(firstCardIDList.size() == 0){
+      return firstCardIDList;
+    }
+    
+    firstCardIDList.addAll(secondCardIDList);    
+  
+    return firstCardIDList;
+  }
+  
+  //获取一副牌的三道顺子组合
+  public List<Integer> getSanShunZiCardIDList(List<Integer> cardIDList){
+    List<Integer> firstCardIDList = new ArrayList<>();
+    List<Integer> secondCardIDList = new ArrayList<>();
+    List<Integer> thirdCardIDList = new ArrayList<>();    
+    
+    //特殊牌型没有鬼牌
+    List<Integer> handJokerCardIDList = new ArrayList<>();
+    
+    //找出13张所有可能的顺子组合
+    List<PokerGroupCardInfo> allShunZiCardInfoList1 = this.getHandValueAllShunZiCardInfo(cardIDList, 5, handJokerCardIDList);
+    
+    int shunziCount1 = allShunZiCardInfoList1.size();
+    //从大到小
+    for(int index1=0; index1<shunziCount1; index1++){
+
+      PokerGroupCardInfo shunziGroupInfo1 = allShunZiCardInfoList1.get(index1);
+      
+      //移除已经使用掉的5张卡牌
+      List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+      this.removeCardByCardIDList(tempCardIDList, shunziGroupInfo1.srcCardIDList);
+      
+      //查找剩余8张所有可能的顺子组合
+      List<PokerGroupCardInfo> allShunZiCardInfoList2 = this.getHandValueAllShunZiCardInfo(tempCardIDList, 5, handJokerCardIDList);
+      
+      int shunziCount2 = allShunZiCardInfoList2.size();
+      //从大到小
+      for(int index2=0; index2<shunziCount2; index2++){
+        PokerGroupCardInfo shunziGroupInfo2 = allShunZiCardInfoList2.get(index2);
+      
+        List<Integer> leftCardIDList = new ArrayList<>(cardIDList);
+        
+        this.removeCardByCardIDList(leftCardIDList, shunziGroupInfo1.srcCardIDList);
+        this.removeCardByCardIDList(leftCardIDList, shunziGroupInfo2.srcCardIDList);
+        
+        HandPokerInfo handPokerInfo3 = this.pokerManager.getHandInfo(leftCardIDList, handJokerCardIDList);
+        
+        //判断最后3张是否是顺子
+        PokerGroupCardInfo groupCardInfo = this.getHandMaxShunZiCardIDList(leftCardIDList, handPokerInfo3.value2CardInfo, handJokerCardIDList, 3);
+        if(groupCardInfo == null){
+          continue;
+        }
+        
+        //找到一个 3顺子
+        firstCardIDList = groupCardInfo.srcCardIDList;
+        secondCardIDList = shunziGroupInfo2.srcCardIDList;
+        thirdCardIDList = shunziGroupInfo1.srcCardIDList;
+        break;
+      }
+    }
+    
+    //没有找到
+    if(firstCardIDList.size() == 0){
+      return firstCardIDList;
+    }
+    
+    String secondString = this.getShunZiSSSDaoStringValue(secondCardIDList);
+    String thirdString = this.getShunZiSSSDaoStringValue(thirdCardIDList);
+    
+    if(secondString.compareTo(thirdString) > 0){
+      firstCardIDList.addAll(thirdCardIDList);
+      firstCardIDList.addAll(secondCardIDList);      
+    }
+    else{
+      firstCardIDList.addAll(secondCardIDList);
+      firstCardIDList.addAll(thirdCardIDList);
+    }
+    
+    return firstCardIDList;
+  }
+  
+  //获取一手牌的所有可能的顺子(支持cardIDList超过5张的手牌)
+  public List<PokerGroupCardInfo> getHandValueAllShunZiCardInfo(List<Integer>allCardIDList, int maxCount, List<Integer> allJokerIDList){
+    
+    List<PokerGroupCardInfo> allShunZiCardInfoList = new ArrayList<>();
+    
+    int cardCount = allCardIDList.size();
+    
+    if(cardCount < 5){
+      this.error("getHandValueAllShunZiCardInfo cardCount:{} error", cardCount);
+      return allShunZiCardInfoList;
+    }
+    
+    //需要筛选出来所有组合 需要用于同花顺判断
+    for (int index1 = 0; index1 < cardCount-4; index1++){
+      
+      int cardID1 = allCardIDList.get(index1);
+      
+      for (int index2 = index1+1; index2 < cardCount-3; index2++){
+        int cardID2 = allCardIDList.get(index2);
+        
+        for (int index3 = index2+1; index3 < cardCount-2; index3++){
+          int cardID3 = allCardIDList.get(index3);
+          
+          for (int index4 = index3+1; index4 < cardCount-1; index4++){
+            int cardID4 = allCardIDList.get(index4);
+            
+            for (int index5 = index4+1; index5 < cardCount; index5++){
+              int cardID5 = allCardIDList.get(index5);
+              
+              List<Integer> handCardIDList = new ArrayList<>(Arrays.asList(cardID1, cardID2, cardID3, cardID4, cardID5));
+              
+              HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+              PokerGroupCardInfo groupCardInfo = this.getHandMaxShunZiCardIDList(handCardIDList, handPokerInfo.value2CardInfo, handPokerInfo.handJokerCardIDList, maxCount);
+              
+              if(groupCardInfo != null){
+                allShunZiCardInfoList.add(groupCardInfo);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    //从大到小排序
+    this.sortShunZiCardInfo(allShunZiCardInfoList);
+    
+    return allShunZiCardInfoList;
+    
+  }

@@ -1,0 +1,659 @@
+	//------------------系统自动摆牌-------------------------------
+	
+	//系统自动摆牌
+	public SSSPointCardInfo autoGetCardInfo(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		
+		List<Integer> tempHandCardIDList = new ArrayList<>(handCardIDList);		
+		
+		//筛选第3道最大牌型
+		PokerGroupCardInfo thirdGroupCardInfo = this.getMaxDaoCardInfo(tempHandCardIDList, allJokerIDList);		
+		this.removeCardByCardIDList(tempHandCardIDList, thirdGroupCardInfo.srcCardIDList);
+		
+		//筛选第2道最大牌型
+		PokerGroupCardInfo secondGroupCardInfo = this.getMaxDaoCardInfo(tempHandCardIDList, allJokerIDList);		
+		this.removeCardByCardIDList(tempHandCardIDList, secondGroupCardInfo.srcCardIDList);
+		
+		//筛选第一道最大牌型
+		SSSDaoCardInfo firstDaoCardInfo = this.auto_get3CardDaoCardInfo(tempHandCardIDList, allJokerIDList);
+		this.removeCardByCardIDList(tempHandCardIDList, firstDaoCardInfo.srcCardIDList);
+		
+		
+		//补齐中间和尾道的卡牌
+		SSSDaoCardInfo thirdDaoCardInfo = this.auto_get5CardDaoCardInfo(thirdGroupCardInfo, tempHandCardIDList);
+		SSSDaoCardInfo secondDaoCardInfo = this.auto_get5CardDaoCardInfo(secondGroupCardInfo, tempHandCardIDList);
+		
+		SSSPointCardInfo cardInfo = new SSSPointCardInfo();		
+
+		cardInfo.endCardIDList.addAll(firstDaoCardInfo.srcCardIDList);
+		cardInfo.cardName.add(firstDaoCardInfo.cardName);	
+
+		if(thirdDaoCardInfo.cardName.compareTo(secondDaoCardInfo.cardName) >= 0){
+			cardInfo.endCardIDList.addAll(secondDaoCardInfo.srcCardIDList);
+			cardInfo.cardName.add(secondDaoCardInfo.cardName);		
+
+			cardInfo.endCardIDList.addAll(thirdDaoCardInfo.srcCardIDList);
+			cardInfo.cardName.add(thirdDaoCardInfo.cardName);
+		}
+		else{
+			//3个3条牌型:03, 208, 303, 103, 105, 402, 204, 412, 408, 306, 308, 207, 313
+			//第一次获取的时候不会筛选出来葫芦,因为不会强拆分2个3条,第1次会筛选出来顺子
+			//第2次因为8被顺子用掉了，就筛选出来葫芦了
+			if(secondDaoCardInfo.cardName.startsWith("c_6")){
+				
+			}
+			else{
+				this.error("自动摆牌倒水了 handCardIDList:{},{}<{}", handCardIDList, thirdDaoCardInfo.srcCardIDList, secondDaoCardInfo.srcCardIDList);
+			}
+			
+			cardInfo.endCardIDList.addAll(thirdDaoCardInfo.srcCardIDList);
+			cardInfo.cardName.add(thirdDaoCardInfo.cardName);
+			
+			cardInfo.endCardIDList.addAll(secondDaoCardInfo.srcCardIDList);
+			cardInfo.cardName.add(secondDaoCardInfo.cardName);		
+			
+		}
+		
+
+		return cardInfo;
+		
+	}	
+	
+	//自动摆牌获取头道卡牌
+	public SSSDaoCardInfo auto_get3CardDaoCardInfo(List<Integer> cardIDList, List<Integer> allJokerIDList){
+		
+		//如果只剩下3张 直接调用头道获取接口
+		if(cardIDList.size() == 3){
+			return this.get3CardCardName(cardIDList, allJokerIDList);		
+		}
+		
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(cardIDList, allJokerIDList);
+		
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+		
+		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
+		
+		PokerGroupCardInfo sanTiaoGroupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, handJokerCardIDList, 3, true);
+		
+		PokerGroupCardInfo duiziGroupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, handJokerCardIDList, 2, true);
+		
+		List<Integer> firstCardIDList = new ArrayList<>();
+		
+		//如果头道可以组成3条
+		if(sanTiaoGroupCardInfo != null){
+			firstCardIDList = sanTiaoGroupCardInfo.srcCardIDList;
+		}
+		//如果头道可以组成对子
+		else if(duiziGroupCardInfo != null){
+			
+			List<Integer> tempCardIDList = new ArrayList<>(cardIDList);
+			this.removeCardByCardIDList(tempCardIDList, duiziGroupCardInfo.srcCardIDList);
+			
+			//取一张最大的
+			int cardID = this.pokerManager.getMaxValueCardIDByCardIDList(tempCardIDList);
+			firstCardIDList = duiziGroupCardInfo.srcCardIDList;
+			firstCardIDList.add(cardID);
+		}
+		//如果都没有，则头道筛选一个最大乌龙
+		else{
+			//如果牌型没有 取前5个设置乌龙 A-K-2
+			this.pokerManager.sortCardIDListMaxA(cardIDList, false);
+			firstCardIDList = new ArrayList<>(cardIDList.subList(0, 3));
+		}
+		
+		return this.get3CardCardName(firstCardIDList, allJokerIDList);	
+	}
+	
+	//补齐后续卡牌ID
+	public SSSDaoCardInfo auto_get5CardDaoCardInfo(PokerGroupCardInfo groupCardInfo, List<Integer> leftCardIDList){
+		
+		SSSDaoCardInfo daoCardInfo = new SSSDaoCardInfo();
+		
+		String cardName = groupCardInfo.cardName;
+		List<Integer> srcCardIDList = groupCardInfo.srcCardIDList;
+		List<Integer> showCardIDList = groupCardInfo.showCardIDList;
+		
+		int leftCount = leftCardIDList.size();
+		
+		//如果是5同
+		if(cardName.startsWith(this.CardName_WuTong)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		//同花顺
+		else if(cardName.startsWith(this.CardName_TongHuaShun)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		//铁支
+		else if(cardName.startsWith(this.CardName_TieZhi)){
+			if(leftCount == 0){
+				this.error("auto_get5CardDaoCardInfo cardName:{}:{} need 1 Card", cardName, srcCardIDList);
+				return null;
+			}
+			int cardID = leftCardIDList.get(0);
+			leftCardIDList.remove(0);
+			
+			srcCardIDList.add(cardID);
+			showCardIDList.add(cardID);
+			
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = this.CardName_TieZhi + "_" + this.getSSSDaoStringValue(showCardIDList);
+		}
+		//葫芦
+		else if(cardName.startsWith(this.CardName_HuLu)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		//同花
+		else if(cardName.startsWith(this.CardName_TongHuaSanTiao)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		else if(cardName.startsWith(this.CardName_TongHuaLiangDui)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		else if(cardName.startsWith(this.CardName_TongHuaYiDui)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		else if(cardName.startsWith(this.CardName_TongHua)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		//顺子
+		else if(cardName.startsWith(this.CardName_ShunZi)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		//3条
+		else if(cardName.startsWith(this.CardName_SanTiao)){
+			if(leftCount < 2){
+				this.error("auto_get5CardDaoCardInfo cardName:{}:{} need 2 Card", cardName, srcCardIDList);
+				return null;
+			}
+			
+			List<Integer> addList = new ArrayList<>(leftCardIDList.subList(0, 2));
+			this.removeCardByCardIDList(leftCardIDList, addList);
+			
+			this.pokerManager.sortCardIDListMaxA(addList, false);
+			
+			srcCardIDList.addAll(addList);
+			showCardIDList.addAll(addList);
+			
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = this.CardName_SanTiao + "_" + this.getSSSDaoStringValue(showCardIDList);
+		}
+		//两队
+		else if(cardName.startsWith(this.CardName_LiangDui)){
+			if(leftCount == 0){
+				this.error("auto_get5CardDaoCardInfo cardName:{}:{} need 1 Card", cardName, srcCardIDList);
+				return null;
+			}
+			int cardID = leftCardIDList.get(0);
+			leftCardIDList.remove(0);
+			
+			srcCardIDList.add(cardID);
+			showCardIDList.add(cardID);
+			
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = this.CardName_LiangDui + "_" + this.getSSSDaoStringValue(showCardIDList);
+		}
+		//一对
+		else if(cardName.startsWith(this.CardName_YiDui)){
+			if(leftCount < 3){
+				this.error("auto_get5CardDaoCardInfo cardName:{}:{} need 3 Card", cardName, srcCardIDList);
+				return null;
+			}
+			List<Integer> addList = new ArrayList<>(leftCardIDList.subList(0, 3));
+			this.removeCardByCardIDList(leftCardIDList, addList);
+			
+			this.pokerManager.sortCardIDListMaxA(addList, false);
+			
+			srcCardIDList.addAll(addList);
+			showCardIDList.addAll(addList);
+			
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = this.CardName_YiDui + "_" + this.getSSSDaoStringValue(showCardIDList);
+		}
+		//乌龙
+		else if(cardName.startsWith(this.CardName_WuLong)){
+			daoCardInfo.srcCardIDList = srcCardIDList;
+			daoCardInfo.showCardIDList = showCardIDList;
+			daoCardInfo.cardName = cardName;
+		}
+		else{
+			this.error("auto_get5CardDaoCardInfo cardName:{} error", cardName);
+			return null;
+		}
+		
+		return daoCardInfo;
+	}
+	
+	
+	//获取所有手牌中组成的最大手牌
+	public PokerGroupCardInfo getMaxDaoCardInfo(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+		
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
+		
+		
+		//获取所有能组成5张连顺的牌型
+		List<PokerGroupCardInfo> allShunZiCardInfoList = this.getHandValueAllShunZiCardInfo(handCardIDList, 5, allJokerIDList);
+		
+		PokerGroupCardInfo groupCardInfo = null;
+	
+		//--------------是否有五同--------------------
+		groupCardInfo = this.auto_c_9_WuTong(value2CardInfo, handJokerCardIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//----------是否有同花顺------------
+		groupCardInfo = this.auto_c_8_TongHuaShun(allShunZiCardInfoList, allJokerIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//---------------是否有铁支----------------------
+		groupCardInfo = this.auto_c_7_TieZhi(value2CardInfo, handJokerCardIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//-------------是否有葫芦-----------------------
+		groupCardInfo = this.auto_c_6_HuLu(handCardIDList, allJokerIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//----------是否有同花-------------
+		groupCardInfo = this.auto_c_5_TongHua(handCardIDList, allJokerIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//-----------是否有顺子--------------
+		groupCardInfo = this.auto_c_4_ShunZi(allShunZiCardInfoList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+
+		
+		//-------是否有 3条----------------
+		groupCardInfo = this.auto_c_3_SanTiao(handCardIDList, allJokerIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		
+		//-------2对-----------
+		groupCardInfo = this.auto_c_2_LiangDui(handCardIDList, allJokerIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//---------1对--------
+		groupCardInfo = this.auto_c_1_YiDui(handCardIDList, allJokerIDList);
+		if(groupCardInfo != null){
+			return groupCardInfo;
+		}
+		
+		//如果牌型没有 取前5个设置乌龙 A-K-2
+		this.pokerManager.sortCardIDListMaxA(handCardIDList, false);
+		
+		List<Integer> wulongCardIDList = new ArrayList<>(handCardIDList.subList(0, 5));
+		
+		groupCardInfo = new PokerGroupCardInfo();
+		groupCardInfo.srcCardIDList = wulongCardIDList;
+		groupCardInfo.showCardIDList = wulongCardIDList;
+		groupCardInfo.cardName = CardName_WuLong + "_" + this.getSSSDaoStringValue(wulongCardIDList);
+
+		return groupCardInfo;
+	}
+	
+		//筛选五同
+	public PokerGroupCardInfo auto_c_9_WuTong(Hashtable<Integer, HandPokerValueInfo> value2CardInfo, List<Integer> handJokerCardIDList){
+		
+		PokerGroupCardInfo groupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, handJokerCardIDList, 5, true);
+		if(groupCardInfo != null){
+			groupCardInfo.cardName = this.CardName_WuTong + "_" + this.getSSSDaoStringValue(groupCardInfo.showCardIDList);;
+		}
+		
+		return groupCardInfo;
+	}
+	
+	//获取最大同花顺
+	public PokerGroupCardInfo auto_c_8_TongHuaShun(List<PokerGroupCardInfo> allShunZiCardInfoList, List<Integer> allJokerIDList){
+		
+		int shunziCount = allShunZiCardInfoList.size();
+		
+		for(int index=0; index<shunziCount; index++){
+			PokerGroupCardInfo shunziGroupCardInfo = allShunZiCardInfoList.get(index);
+				
+			//是否是同花,有可能是鬼牌组成的同花
+			if(this.pokerManager.isTongHua(shunziGroupCardInfo.srcCardIDList, allJokerIDList)){
+				
+				PokerGroupCardInfo groupCardInfo = new PokerGroupCardInfo();
+				groupCardInfo.cardName = CardName_TongHuaShun + "_" + this.getShunZiSSSDaoStringValue(shunziGroupCardInfo.showCardIDList);;
+				groupCardInfo.srcCardIDList = shunziGroupCardInfo.srcCardIDList;
+				groupCardInfo.showCardIDList = shunziGroupCardInfo.showCardIDList;
+				return groupCardInfo;
+			}
+		}
+		
+		return null;
+	}
+	
+	
+	//获取最大的铁支, 只筛选出来4张牌,最后一张要等待其他道筛选完成后追加
+	public PokerGroupCardInfo auto_c_7_TieZhi(Hashtable<Integer, HandPokerValueInfo> value2CardInfo, List<Integer> handJokerCardIDList){
+		
+		PokerGroupCardInfo groupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, handJokerCardIDList, 4, true);
+		if(groupCardInfo != null){
+			groupCardInfo.cardName = CardName_TieZhi;
+		}
+		
+		return groupCardInfo;
+	}
+	
+	
+	//筛选自动排序的葫芦
+	public PokerGroupCardInfo auto_c_6_HuLu(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+		
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+
+		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
+		
+		List<Integer> tempCardIDList = new ArrayList<>(handCardIDList);
+		List<Integer> tempHandJokerCardIDList = new ArrayList<>(handJokerCardIDList);
+		
+		//获取3条
+		PokerGroupCardInfo firstGroupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, tempHandJokerCardIDList, 3, true);
+		if(firstGroupCardInfo == null){
+			return null;
+		}		
+		
+		List<Integer> srcCardIDList = firstGroupCardInfo.srcCardIDList;
+		List<Integer> showCardIDList = firstGroupCardInfo.showCardIDList;
+		
+		//删除3条
+		this.removeCardByCardIDList(tempCardIDList, srcCardIDList);
+		
+		//在剩余的牌里找对子
+		HandPokerInfo tempHandPokerInfo = this.pokerManager.getHandInfo(tempCardIDList, allJokerIDList);
+		
+		Hashtable<Integer, HandPokerValueInfo> tempValue2CardInfo = tempHandPokerInfo.value2CardInfo;
+		
+		List<Integer> sanTiaoCardIDList = new ArrayList<>();
+		
+		Hashtable<Integer, List<Integer>> allDuiZiInfo = new Hashtable<>();
+		
+		for(HandPokerValueInfo valueInfo:tempValue2CardInfo.values()){
+			
+			List<Integer> sameValueCardIDList = valueInfo.cardIDList;
+
+			//另一个3条,不拆分为对子
+			if(sameValueCardIDList.size() > 2){
+				sanTiaoCardIDList.addAll(sameValueCardIDList);
+			}
+			else if(sameValueCardIDList.size() < 2){
+				continue;
+			}
+			else{
+				int cardID = sameValueCardIDList.get(0);
+				Poker poker = this.pokerManager.getPokerByCardID(cardID);
+				allDuiZiInfo.put(poker.value, sameValueCardIDList);
+			}
+		}
+		
+		List<Integer> duiziSrcCardIDList = new ArrayList<>();
+		List<Integer> duiziShowCardIDList = new ArrayList<>();
+		
+		//如果找到对子
+		if(allDuiZiInfo.size() > 0){
+			List<Integer> duiziValueList = new ArrayList<>(allDuiZiInfo.keySet());
+			this.pokerManager.sortCardValueList(duiziValueList);
+			int minValue = duiziValueList.get(duiziValueList.size() - 1);
+			allDuiZiInfo.get(minValue);
+			
+			duiziSrcCardIDList = allDuiZiInfo.get(minValue);
+			duiziShowCardIDList = new ArrayList<>(allDuiZiInfo.get(minValue));
+		}
+		//如果没有找到对子
+		else{
+			
+			//删除掉所有的3条,在剩余的牌里面用鬼牌参与找对子,3条先不查分,可能要组成2道3条
+			this.removeCardByCardIDList(tempCardIDList, sanTiaoCardIDList);
+			
+			//没有剩余牌了， 都是3条 和鬼牌
+			if(tempCardIDList.size() == 0){
+				//随便筛选一个最小的对子出来
+				PokerGroupCardInfo duiziGroupCardInfo = this.getHandMaxSameValueCardIDList(tempHandPokerInfo.value2CardInfo, tempHandPokerInfo.handJokerCardIDList, 2, false);
+				if(duiziGroupCardInfo == null){
+					return null;
+				}
+				duiziSrcCardIDList = new ArrayList<>(duiziGroupCardInfo.srcCardIDList);
+				duiziShowCardIDList = new ArrayList<>(duiziGroupCardInfo.showCardIDList);
+			}
+			else{
+				
+				//移除掉3条后,筛选一个最小对子出来
+				HandPokerInfo tempHandPokerInfo2 = this.pokerManager.getHandInfo(tempCardIDList, allJokerIDList);
+				
+				PokerGroupCardInfo duiziGroupCardInfo = this.getHandMaxSameValueCardIDList(tempHandPokerInfo2.value2CardInfo, tempHandPokerInfo2.handJokerCardIDList, 2, false);
+				if(duiziGroupCardInfo == null){
+					return null;
+				}
+				duiziSrcCardIDList = new ArrayList<>(duiziGroupCardInfo.srcCardIDList);
+				duiziShowCardIDList = new ArrayList<>(duiziGroupCardInfo.showCardIDList);
+			}
+			
+		}
+		
+		if(duiziSrcCardIDList.size() != 2){
+			return null;
+		}
+		
+		srcCardIDList.addAll(duiziSrcCardIDList);
+		showCardIDList.addAll(duiziShowCardIDList);
+		
+		PokerGroupCardInfo huluGropCardInfo = new PokerGroupCardInfo();
+		huluGropCardInfo.cardName = CardName_HuLu + "_" + this.getSSSDaoStringValue(showCardIDList);;
+		huluGropCardInfo.srcCardIDList = srcCardIDList;
+		huluGropCardInfo.showCardIDList = showCardIDList;
+		
+		return huluGropCardInfo;
+	}
+	
+	//筛选最大的同花
+	public PokerGroupCardInfo auto_c_5_TongHua(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		
+		HandPokerInfo handPokerInfo1 = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+		List<Integer> handJokerCardIDList = handPokerInfo1.handJokerCardIDList;
+		
+		Hashtable<Integer, HandPokerColorInfo> color2CardInfo1 = handPokerInfo1.color2CardInfo;		
+		
+		Hashtable<String, SSSDaoCardInfo> allTonghuaCardInfo = new Hashtable<>();
+
+		for(int color : color2CardInfo1.keySet()){
+			HandPokerColorInfo colorInfo = color2CardInfo1.get(color);
+			
+			//如果同花数量+鬼牌数量 >= 5追加
+			if(colorInfo.cardIDList.size() + handJokerCardIDList.size() >= 5){
+				Hashtable<String, SSSDaoCardInfo> colorTonghuaCardInfo = this.getAllTongHuaCardIDList(colorInfo.cardIDList, handJokerCardIDList, allJokerIDList);
+				allTonghuaCardInfo.putAll(colorTonghuaCardInfo);
+			}
+		}
+		
+		List<String> allCardNameList = new ArrayList<>(allTonghuaCardInfo.keySet());
+		if(allCardNameList.size() == 0){
+			return null;
+		}
+		
+		this.sortCardNameList(allCardNameList);
+		
+		String cardName = allCardNameList.get(0);
+		
+		SSSDaoCardInfo daoCardInfo = allTonghuaCardInfo.get(cardName);
+		
+		PokerGroupCardInfo groupCardInfo = new PokerGroupCardInfo();
+		groupCardInfo.srcCardIDList = daoCardInfo.srcCardIDList;
+		groupCardInfo.showCardIDList = daoCardInfo.showCardIDList;
+		groupCardInfo.cardName = cardName;
+		return groupCardInfo;
+		
+	}
+	
+	
+	//获取一色牌 中所有同花组合的牌型字典
+	public Hashtable<String, SSSDaoCardInfo> getAllTongHuaCardIDList(List<Integer> colorCardIDList, List<Integer> handJokerIDList, List<Integer>allJokerIDList){
+		Hashtable<String, SSSDaoCardInfo> colorTonghuaCardInfo = new Hashtable<>();
+		
+		List<Integer> allCardIDList = new ArrayList<>(colorCardIDList);
+		allCardIDList.addAll(handJokerIDList);
+		
+		int cardCount = allCardIDList.size();
+		
+		if(cardCount < 5){
+			return colorTonghuaCardInfo;
+		}
+		
+		for (int index1 = 0; index1 < cardCount-4; index1++){
+			
+			int cardID1 = allCardIDList.get(index1);
+			
+			for (int index2 = index1+1; index2 < cardCount-3; index2++){
+				int cardID2 = allCardIDList.get(index2);
+				
+				for (int index3 = index2+1; index3 < cardCount-2; index3++){
+					int cardID3 = allCardIDList.get(index3);
+					
+					for (int index4 = index3+1; index4 < cardCount-1; index4++){
+						int cardID4 = allCardIDList.get(index4);
+						
+						for (int index5 = index4+1; index5 < cardCount; index5++){
+							int cardID5 = allCardIDList.get(index5);
+							
+							List<Integer> handCardIDList = new ArrayList<>(Arrays.asList(cardID1, cardID2, cardID3, cardID4, cardID5));
+							
+							HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+							
+							SSSDaoCardInfo tonghuaCardInfo = this.c_5_TongHua(handCardIDList, handPokerInfo.color2CardInfo, handPokerInfo.value2CardInfo, handPokerInfo.handJokerCardIDList, allJokerIDList);
+							if(tonghuaCardInfo != null){
+								colorTonghuaCardInfo.put(tonghuaCardInfo.cardName, tonghuaCardInfo);
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		return colorTonghuaCardInfo;
+	}
+	
+	//筛选顺子
+	public PokerGroupCardInfo auto_c_4_ShunZi(List<PokerGroupCardInfo> allShunZiCardInfoList){
+		
+		int shunziCount = allShunZiCardInfoList.size();
+		if(shunziCount == 0){
+			return null;
+		}
+		
+		//第一个就是最大的顺子
+		PokerGroupCardInfo shunziGroupInfo = allShunZiCardInfoList.get(0);
+		
+		PokerGroupCardInfo groupCardInfo = new PokerGroupCardInfo();
+		groupCardInfo.srcCardIDList = shunziGroupInfo.srcCardIDList;
+		groupCardInfo.showCardIDList = shunziGroupInfo.showCardIDList;
+		groupCardInfo.cardName = CardName_ShunZi + "_" + this.getShunZiSSSDaoStringValue(shunziGroupInfo.showCardIDList);;
+		return groupCardInfo;
+	}
+	
+	
+	//筛选3条,只筛选出来3张，另外2张等最后添加
+	public PokerGroupCardInfo auto_c_3_SanTiao(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
+		
+		PokerGroupCardInfo groupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, handJokerCardIDList, 3, true);
+		if(groupCardInfo != null){
+			groupCardInfo.cardName = CardName_SanTiao;
+			return groupCardInfo;
+		}
+		return null;
+	}
+
+	//筛选2对，只筛选4张出来 ，另外一张最后添加
+	public PokerGroupCardInfo auto_c_2_LiangDui(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
+		
+		//鬼牌列表会被修改需要拷贝一份
+		List<Integer> tempCardIDList = new ArrayList<>(handCardIDList);
+		List<Integer> tempHandJokerCardIDList = new ArrayList<>(handJokerCardIDList);
+		
+		PokerGroupCardInfo firstGroupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, tempHandJokerCardIDList, 2, true);
+		if(firstGroupCardInfo == null){
+			return null;
+		}
+		
+		//删除第一个对子
+		this.removeCardByCardIDList(tempCardIDList, firstGroupCardInfo.srcCardIDList);
+		
+		HandPokerInfo tempHandPokerInfo = this.pokerManager.getHandInfo(tempCardIDList, allJokerIDList);
+		PokerGroupCardInfo secondGroupCardInfo = this.getHandMaxSameValueCardIDList(tempHandPokerInfo.value2CardInfo, tempHandPokerInfo.handJokerCardIDList, 2, true);
+		if(secondGroupCardInfo == null){
+			return null;
+		}
+		//第一个对子
+		List<Integer> srcCardIDList = new ArrayList<>(firstGroupCardInfo.srcCardIDList);
+		List<Integer> showCardIDList = new ArrayList<>(firstGroupCardInfo.showCardIDList);
+		
+		//第2个对子
+		srcCardIDList.addAll(secondGroupCardInfo.srcCardIDList);
+		showCardIDList.addAll(secondGroupCardInfo.showCardIDList);
+		
+		PokerGroupCardInfo groupCardInfo = new PokerGroupCardInfo();
+		groupCardInfo.srcCardIDList = srcCardIDList;
+		groupCardInfo.showCardIDList = showCardIDList;
+		groupCardInfo.cardName = CardName_LiangDui;
+		return groupCardInfo;
+
+	}
+	
+	//只筛选一个对子出来，后面3张最后添加
+	public PokerGroupCardInfo auto_c_1_YiDui(List<Integer> handCardIDList, List<Integer> allJokerIDList){
+		
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
+		
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
+		
+		PokerGroupCardInfo groupCardInfo = this.getHandMaxSameValueCardIDList(value2CardInfo, handJokerCardIDList, 2, true);
+		if(groupCardInfo != null){
+			groupCardInfo.cardName = CardName_YiDui;
+			return groupCardInfo;
+		}
+		
+		return null;
+	}
+	
