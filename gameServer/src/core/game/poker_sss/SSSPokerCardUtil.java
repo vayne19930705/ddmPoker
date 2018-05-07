@@ -8,10 +8,10 @@ import java.util.Collections;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import org.omg.CORBA.PUBLIC_MEMBER;
 
-import com.sun.corba.se.impl.oa.poa.Policies;
 
 import business.global.log.BaseLog;
 import business.global.poker.HandPokerColorInfo;
@@ -20,6 +20,7 @@ import business.global.poker.HandPokerValueInfo;
 import business.global.poker.Poker;
 import business.global.poker.PokerGroupCardInfo;
 import business.global.poker.PokerManager;
+
 
 public class SSSPokerCardUtil extends BaseLog{
 	
@@ -69,7 +70,7 @@ public class SSSPokerCardUtil extends BaseLog{
 	public String CardName_SiTaoSanTiao = "s_15";//四套三条：拥有四组三条。
 	
 	public String CardName_SanHuangWuDi = "s_14";//三皇五帝
-	public String CardName_ShiErHuangZu = "s_13";//十二皇族 A?
+	public String CardName_ShiErHuangZu = "s_13";//十二皇族 
 	public String CardName_QuanDa = "s_12";//全大
 	public String CardName_QuanXiao = "s_11";//全小
 	public String CardName_CouYiSe = "s_10";//凑一色
@@ -114,11 +115,17 @@ public class SSSPokerCardUtil extends BaseLog{
 	public void onStart(){
 		
 		//玩家手牌5张
-		List<Integer> handCardIDList = new ArrayList<>(Arrays.asList(101,102,103,401,401,500,304,304,410,412,412,413,500));
+		List<Integer> handCardIDList = new ArrayList<>(Arrays.asList(110,312,311,113,112,211,310,201,105,106,407,308,209));
 		
-		SSSPointCardInfo cardInfo = this.getCardInfo(handCardIDList, this.allJokerCardIDList);
+		SSSSpecailCardInfo cardInfo = this.getSpecailCardInfo(handCardIDList, this.allJokerCardIDList,1);
 		
-		this.info(":{} 结果:{},{}", handCardIDList, cardInfo.cardName, cardInfo.endCardIDList);
+		if(cardInfo == null){
+			this.info("非特殊牌");
+		}
+		else{
+			this.info(":{} 结果:{},{}", handCardIDList, cardInfo.cardName, cardInfo.cardIDList);
+		}
+			
 	}
 	
 	//------------------普通牌型----------------------------
@@ -349,8 +356,11 @@ public class SSSPokerCardUtil extends BaseLog{
 		this.removeCardByIDList(leftJokerIDList, pokerGroupCardInfo.srcCardIDList);
 		showCardIDList.addAll(pokerGroupCardInfo.showCardIDList);
 		//加入剩余的2张牌
-		this.pokerManager.sortCardIDListMaxA(leftPokerIDList, false);
-		showCardIDList.addAll(leftPokerIDList);
+		if(leftPokerIDList.size() != 0)
+		{
+			this.pokerManager.sortCardIDListMaxA(leftPokerIDList, false);
+			showCardIDList.addAll(leftPokerIDList);
+		}
 		stringValue = getPokerStringValueArray(showCardIDList);
 		cardName = String.format(CardName_SanTiao, stringValue);
 		
@@ -674,7 +684,7 @@ public class SSSPokerCardUtil extends BaseLog{
 			showCardIDList = new ArrayList<>(cardIDList);
 			int needCount = findCardCount - cardIDList.size();
 			
-			for(int index_2=0; index_2<needCount; index_2++){
+			for(int index_2 = 0; index_2 < needCount; index_2++){
 				int jokerCardID = handJokerCardIDList.get(index_2);
 				
 				srcCardIDList.add(jokerCardID);
@@ -947,115 +957,747 @@ public class SSSPokerCardUtil extends BaseLog{
 		if(specailCardInfo != null){
 			return specailCardInfo;
 		}
+//		
+//		specailCardInfo =  s_05_LiuLiuDaShun(point, handCardIDList, color2CardInfo, value2CardInfo);	
+//		if(specailCardInfo != null){
+//			return specailCardInfo;
+//		}
 		
-		specailCardInfo =  s_05_LiuLiuDaShun(point, handCardIDList, color2CardInfo, value2CardInfo);	
-		if(specailCardInfo != null){
-			return specailCardInfo;
-		}
-		
-		specailCardInfo =  s_04_BeiDouQiXing(point, handCardIDList, color2CardInfo, value2CardInfo);	
-		if(specailCardInfo != null){
-			return specailCardInfo;
-		}
+//		specailCardInfo =  s_04_BeiDouQiXing(point, handCardIDList, color2CardInfo, value2CardInfo);	
+//		if(specailCardInfo != null){
+//			return specailCardInfo;
+//		}
 		
 		specailCardInfo =  s_03_BaXianGuoHai(point, handCardIDList, color2CardInfo, value2CardInfo);	
 		
 		return specailCardInfo;
 	}
 	
-	//1.	至尊青龙：A—K清一色顺子。
-	public SSSSpecailCardInfo s_19_ZhiZunQingLong(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+	//1.	至尊青龙：A—K清一色顺子。104分
+	public SSSSpecailCardInfo s_19_ZhiZunQingLong(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		if( color2CardInfo.size() != 1)
+		{
+			return null;
+		}
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.isShunZi(leftHandCardIDList,true);
+		if( pokerGroupCardInfo != null)
+		{
+			sssSpecailCardInfo.cardName = CardName_ZhiZunQingLong;
+			this.pokerManager.sortCardIDListMaxK(pokerGroupCardInfo.showCardIDList, true);
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			return sssSpecailCardInfo;
+		}
+		
 		return null;
 	}
 	
-	//2.	一条龙：A—K顺子。
-	public SSSSpecailCardInfo s_18_YiTiaoLong(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+	//2.	一条龙：A—K顺子。52分
+	public SSSSpecailCardInfo s_18_YiTiaoLong(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.isShunZi(leftHandCardIDList,false);
+		if( pokerGroupCardInfo != null)
+		{
+			sssSpecailCardInfo.cardName = CardName_YiTiaoLong;
+			this.pokerManager.sortCardIDListMaxK(pokerGroupCardInfo.showCardIDList, true);
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			return sssSpecailCardInfo;
+		}
+		
 		return null;
 	}
 	
-	//3.	三同花顺：头道、中道、尾道皆可配出同花顺牌型。   
-	public SSSSpecailCardInfo s_17_SanTongHuaShun(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+	//3.	三同花顺：头道、中道、尾道皆可配出同花顺牌型。   26分
+	public SSSSpecailCardInfo s_17_SanTongHuaShun(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> showCardIDList = new ArrayList<>();
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = this.getShunZi(leftHandCardIDList, true);
+		
+		if( pokerGroupCardInfo != null )
+		{
+			Collections.reverse(showCardIDList);
+			sssSpecailCardInfo.cardName = CardName_SanTongHuaShun;
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			return sssSpecailCardInfo;
+		}
+		
 		return null;
+		
 	}
 	
-	//4.	三分天下：三组铁支和任意单牌。
-	public SSSSpecailCardInfo s_16_SanFenTianXia(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+	//4.	三分天下：三组铁支和任意单牌。26分
+	public SSSSpecailCardInfo s_16_SanFenTianXia(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getMaxSameValueIDList(cardIDList, 3, 4, true);
+		if( pokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+		pokerGroupCardInfo.srcCardIDList.addAll(leftHandCardIDList);
+		pokerGroupCardInfo.showCardIDList.addAll(leftHandCardIDList);
+		
+		sssSpecailCardInfo.cardName = CardName_SanFenTianXia;
+		sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+		
+		return sssSpecailCardInfo;
 	}
 	
 	//10.	四套三条：拥有四组三条，赢每家6分。
-	public SSSSpecailCardInfo s_15_SiTaoSanTiao(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+	public SSSSpecailCardInfo s_15_SiTaoSanTiao(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = this.getMaxSameValueIDList(leftHandCardIDList, 4, 3, true);
+		if( pokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+		pokerGroupCardInfo.srcCardIDList.addAll(leftHandCardIDList);
+		pokerGroupCardInfo.showCardIDList.addAll(leftHandCardIDList);
+		
+		sssSpecailCardInfo.cardName = CardName_SiTaoSanTiao;
+		sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+		
+		return sssSpecailCardInfo;
+		
 	}
 	
 	//2个5同，1个三条
-	public SSSSpecailCardInfo s_14_SanHuangWuDi(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+	public SSSSpecailCardInfo s_14_SanHuangWuDi(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		List<Integer> showCardIDList = new ArrayList<>();
+		PokerGroupCardInfo firstPokerGroupCardInfo = this.getMaxSameValueIDList(leftHandCardIDList, 2, 5, true);
+		if( firstPokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, firstPokerGroupCardInfo.srcCardIDList);
+		showCardIDList.addAll(firstPokerGroupCardInfo.showCardIDList);
+		PokerGroupCardInfo secondPokerGroupCardInfo = this.getMaxSameValueIDList(leftHandCardIDList, 1, 3, true);
+		if (secondPokerGroupCardInfo == null) {
+			return null;
+		}
+		
+		showCardIDList.addAll(secondPokerGroupCardInfo.showCardIDList);
+	
+		sssSpecailCardInfo.cardName = CardName_SanHuangWuDi;
+		sssSpecailCardInfo.cardIDList = showCardIDList;
+		
+		return sssSpecailCardInfo;
+		
 	}
 	
 	//13张都是J-Q-K-A，赢每家24分。
 	public SSSSpecailCardInfo s_13_ShiErHuangZu(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
 		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getValueInRange(leftHandCardIDList, 12, 11, 1, true);
+		if( pokerGroupCardInfo != null)
+		{
+			sssSpecailCardInfo.cardIDList.addAll(pokerGroupCardInfo.showCardIDList);
+			this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+			sssSpecailCardInfo.cardIDList.addAll(leftHandCardIDList);
+			sssSpecailCardInfo.cardName = CardName_ShiErHuangZu;
+			return sssSpecailCardInfo;
+		}
 		return null;
 	}
 	
 	//十三张牌数字都为8~A，赢每家10分。
 	public SSSSpecailCardInfo s_12_QuanDa(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
 		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getValueInRange(leftHandCardIDList, 13, 8, 1, true);
+		if( pokerGroupCardInfo != null)
+		{
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			sssSpecailCardInfo.cardName = CardName_QuanDa;
+			return sssSpecailCardInfo;
+		}
 		return null;
 	}
 	
 	//十三张牌数字都为2~8，赢每家10分。
 	public SSSSpecailCardInfo s_11_QuanXiao(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getValueInRange(leftHandCardIDList, 13, 2, 8, true);
+		if( pokerGroupCardInfo != null)
+		{
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			sssSpecailCardInfo.cardName = CardName_QuanXiao;
+			return sssSpecailCardInfo;
+		}
 		return null;
 	}
 
 	//9.	凑一色：十三张牌都是红色（方块/红心）或黑色（梅花/黑桃），赢每家10分。
-	public SSSSpecailCardInfo s_10_CouYiSe(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+	public SSSSpecailCardInfo s_10_CouYiSe(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getSameColorCardIDList(leftHandCardIDList, 1, 13, 2);
+		
+		if( pokerGroupCardInfo != null)
+		{System.out.println("11");
+			sssSpecailCardInfo.cardName = CardName_CouYiSe;
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			return sssSpecailCardInfo;
+		}
 		
 		return null;
 	}
 	
-	//11.	五对冲三：拥有5个对子和一个三条，赢每家5分。
-	public SSSSpecailCardInfo s_09_WuDuiChongSan(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+	//14.	三同花：头道、中道、尾道皆可配出同花牌型，赢每家5分。
+	public SSSSpecailCardInfo s_08_SanTongHua(int point, List<Integer> cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		List<Integer> showCardIDList = new ArrayList<>();
+		PokerGroupCardInfo firstPokerGroupCardInfo = this.getSameColorCardIDList(leftHandCardIDList, 2, 5, 4);
+		if( firstPokerGroupCardInfo != null)
+		{
+			showCardIDList.addAll(firstPokerGroupCardInfo.showCardIDList);
+		}
+		
+		//在调用getSameColorCardIDList()时，leftHandCardIDList已经被更新过
+		PokerGroupCardInfo secondPokerGroupCardInfo = this.getSameColorCardIDList(leftHandCardIDList, 1, 3, 4);
+		
+		if( secondPokerGroupCardInfo != null)
+		{
+			showCardIDList.addAll(secondPokerGroupCardInfo.showCardIDList);
+		}
+		if(showCardIDList.size() == 13)
+		{
+			sssSpecailCardInfo.cardName = CardName_SanTongHua;
+			Collections.reverse(showCardIDList);
+			sssSpecailCardInfo.cardIDList = showCardIDList;
+			return sssSpecailCardInfo;
+		}
 		return null;
 	}
-	
-	//14.	三同花：头道、中道、尾道皆可配出同花牌型，赢每家5分。
-	public SSSSpecailCardInfo s_08_SanTongHua(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+
+	//11.	五对冲三：拥有5个对子和一个三条，赢每家5分。
+	public SSSSpecailCardInfo s_09_WuDuiChongSan(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		List<Integer> showCardIDList = new ArrayList<>();
+		PokerGroupCardInfo firstPokerGroupCardInfo = this.getMaxSameValueIDList(leftHandCardIDList, 1, 3, true);
+		if( firstPokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, firstPokerGroupCardInfo.srcCardIDList);
+		showCardIDList.addAll(firstPokerGroupCardInfo.showCardIDList);
+		
+		PokerGroupCardInfo secondPokerGroupCardInfo = this.getMaxSameValueIDList(leftHandCardIDList, 5, 2, true);
+		if (secondPokerGroupCardInfo == null) {
+			return null;
+		}
+		
+		showCardIDList.addAll(secondPokerGroupCardInfo.showCardIDList);
+		Collections.reverse(showCardIDList);
+		sssSpecailCardInfo.cardName = CardName_WuDuiChongSan;
+		sssSpecailCardInfo.cardIDList = showCardIDList;
+		
+		return sssSpecailCardInfo;
 	}
 	
 	//13.	三顺子：头道、中道、尾道皆可配出顺子牌型，赢每家5分。
 	public SSSSpecailCardInfo s_07_SanShunZi(int point, List<Integer>cardIDList){
-		return null;
+        SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> showCardIDList = new ArrayList<>();
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = this.getShunZi(leftHandCardIDList, false);
+		
+		if( pokerGroupCardInfo != null )
+		{
+			Collections.reverse(showCardIDList);
+			sssSpecailCardInfo.cardName = CardName_SanShunZi;
+			sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+			return sssSpecailCardInfo;
+		}		
+		return null;	
 	}
 	
 
 		
 	//12.	六对半：13张牌中拥有6张对牌，赢每家5分。
 	public SSSSpecailCardInfo s_06_LiuDuiBan(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getMaxSameValueIDList(cardIDList, 6, 2, true);
+		if( pokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+		pokerGroupCardInfo.srcCardIDList.addAll(leftHandCardIDList);
+		pokerGroupCardInfo.showCardIDList.addAll(leftHandCardIDList);
+		
+		sssSpecailCardInfo.cardName = CardName_LiuDuiBan;
+		sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+		
+		return sssSpecailCardInfo;
 	}
 	
 	//6.	六六大顺：有6张一样的牌，赢每家20分。
 	public SSSSpecailCardInfo s_05_LiuLiuDaShun(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = this.getMaxSameValueIDList(cardIDList, 1, 6, true);
+		if( pokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+		this.pokerManager.sortCardIDListMaxA(leftHandCardIDList, false);
+		pokerGroupCardInfo.srcCardIDList.addAll(leftHandCardIDList);
+		pokerGroupCardInfo.showCardIDList.addAll(leftHandCardIDList);
+		
+		sssSpecailCardInfo.cardName = CardName_LiuLiuDaShun;
+		sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+		
+		return sssSpecailCardInfo;
+		
 	}
 	
 	//6.	北斗七星：有7张一样的牌，赢每家20分。
 	public SSSSpecailCardInfo s_04_BeiDouQiXing(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
-		return null;
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = this.getMaxSameValueIDList(cardIDList, 1, 7, true);
+		if( pokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+		this.pokerManager.sortCardIDListMaxA(leftHandCardIDList, false);
+		pokerGroupCardInfo.srcCardIDList.addAll(leftHandCardIDList);
+		pokerGroupCardInfo.showCardIDList.addAll(leftHandCardIDList);
+		
+		sssSpecailCardInfo.cardName = CardName_BeiDouQiXing;
+		sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+		
+		return sssSpecailCardInfo;
 	}
 	
 	//6.	八仙过海：有8张一样的牌，赢每家20分。
-	public SSSSpecailCardInfo s_03_BaXianGuoHai(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){
+	public SSSSpecailCardInfo s_03_BaXianGuoHai(int point, List<Integer>cardIDList, Hashtable<Integer, HandPokerColorInfo> color2CardInfo, Hashtable<Integer, HandPokerValueInfo> value2CardInfo){		
+		SSSSpecailCardInfo sssSpecailCardInfo = new SSSSpecailCardInfo();
+		
+		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = this.getMaxSameValueIDList(cardIDList, 1, 8, true);
+		if( pokerGroupCardInfo == null)
+		{
+			return null;
+		}
+		
+		this.removeCardByIDList(leftHandCardIDList, pokerGroupCardInfo.srcCardIDList);
+		this.pokerManager.sortCardIDListMaxA(leftHandCardIDList, false);
+		pokerGroupCardInfo.srcCardIDList.addAll(leftHandCardIDList);
+		pokerGroupCardInfo.showCardIDList.addAll(leftHandCardIDList);
+		
+		sssSpecailCardInfo.cardName = CardName_BaXianGuoHai;
+		sssSpecailCardInfo.cardIDList = pokerGroupCardInfo.showCardIDList;
+		
+		return sssSpecailCardInfo;
+	}
+	
+	public PokerGroupCardInfo getMaxSameValueIDList(List<Integer> handCardIDList, int groups, int numberOfEachGroup, boolean isFindMax)
+	{
+		PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
+				
+		List<Integer> srcCardIDList = new ArrayList<>();
+		List<Integer> showCardIDList = new ArrayList<>();	
+		//复制一份handCardIDList
+		List<Integer> leftCardIDList = new ArrayList<>(handCardIDList);
+		//寻找groups组，每组numberOfEachGroup张牌
+		for( int group = 0; group < groups; group++)
+		{
+			HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(leftCardIDList, new ArrayList<>());
+			Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+			
+			List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+			int valueCount = valueList.size();
+			if (valueCount == 0 ) {
+				return null;
+			}
+	
+			this.pokerManager.sortCardValueList(valueList);
+			//如果找最小，反转排序
+			if( !isFindMax )
+			{
+				Collections.reverse(valueList);
+			}
+			
+			for(int index = 0; index < valueCount; index++)
+			{
+				int value = valueList.get(index);
+				HandPokerValueInfo handPokerValueInfo = value2CardInfo.get(value);
+				PokerGroupCardInfo tempPokerGroupCardInfo = this.getSameValuePokerGroupCardInfo(handPokerValueInfo, new ArrayList<>(), numberOfEachGroup);
+				
+				if( tempPokerGroupCardInfo != null)
+				{
+					srcCardIDList.addAll(tempPokerGroupCardInfo.srcCardIDList);
+					showCardIDList.addAll(tempPokerGroupCardInfo.showCardIDList);
+					//this.pokerManager.sortCardIDListMaxA(showCardIDList, false);
+					//移除已经挑出来的牌
+					this.removeCardByIDList(leftCardIDList, tempPokerGroupCardInfo.srcCardIDList);
+					break; //挑选到合适的一组，跳出for循环
+				}
+			}
+		}
+		if( showCardIDList.size() == groups * numberOfEachGroup)
+		{
+			pokerGroupCardInfo.srcCardIDList = srcCardIDList;
+			pokerGroupCardInfo.showCardIDList = showCardIDList;
+			return pokerGroupCardInfo;
+		}
 		
 		return null;
 	}
 	
+	public PokerGroupCardInfo getValueInRange(List<Integer> handCardIDList,int need ,int leftBound,int rightBound,boolean maxIsA){
+		PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
+		
+		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, new ArrayList<>());
+		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
+		
+		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+		int valueCount = valueList.size();
+		
+		if(valueCount == 0)
+		{
+			return null;
+		}
+		
+		this.pokerManager.sortCardValueList(valueList);
+		//如果最大单牌为A，且右边界是A，将右边界记为14
+		if( maxIsA && rightBound == 1)
+		{
+			rightBound = 14;
+		}
+		int count = 0;
+		for( int index = 0 ; index < valueCount; index++)
+		{
+			 int value = valueList.get(index);
+			
+			 HandPokerValueInfo handPokerValueInfo = value2CardInfo.get(value);
+			 if (maxIsA && value == 1) 
+			 {
+				 value = 14;
+			 }
+			 
+			 if( value >= leftBound && value <= rightBound )
+			 {				 
+				for( int cardID : handPokerValueInfo.cardIDList)
+				{
+					if (count < need )
+					{ 
+						pokerGroupCardInfo.srcCardIDList.add(cardID);
+						pokerGroupCardInfo.showCardIDList.add(cardID);
+						count++; 
+					}else
+					{
+						break;
+					}
+				}	 
+			 }
+			 if( count >= need)
+			 {
+				 break;
+			 }
+		}
+		if( pokerGroupCardInfo.srcCardIDList.size() < need)
+		{
+			return null;
+		}
+		
+		this.pokerManager.sortCardIDListMaxA(pokerGroupCardInfo.showCardIDList, false);
+		
+		return pokerGroupCardInfo;
+		
+	}
 	
+	public PokerGroupCardInfo getSameColorCardIDList(List<Integer> handCardIDList, int groups, int numberOfEachGroup, int kindOfColor)
+	{
+		PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
+		
+		List<Integer> srcCardIDList = new ArrayList<>();
+		List<Integer> showCardIDList = new ArrayList<>();
+		
+		for(int group = 0; group < groups; group++)
+		{
+			HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, new ArrayList<>());
+			Hashtable<Integer, HandPokerColorInfo> tempColor2CardInfo = handPokerInfo.color2CardInfo;
+			
+			Hashtable<Integer, HandPokerColorInfo> color2CardInfo = new Hashtable<>();
+			//若要求按红黑分类，创建新的hashtable，将红色牌、黑色牌合并
+			if( kindOfColor == 2)
+			{
+				color2CardInfo = this.mergePokerByRedOrBlack(tempColor2CardInfo);
+			}
+			else
+			{
+				color2CardInfo = new Hashtable<>(tempColor2CardInfo);
+			}
+			
+			List<Integer> colorList = new ArrayList<>(color2CardInfo.keySet());
+			int colorCount = colorList.size();	
+			if (colorCount == 0) {
+				return null;
+			}
+			
+			for( int index = 0; index < colorCount; index++)
+			{
+				int color = colorList.get(index);
+				
+				HandPokerColorInfo handPokerColorInfo = color2CardInfo.get(color); 
+				
+				
+				PokerGroupCardInfo tempPokerGroupCardInfo = this.getSameColorPokerGroupInfo(handPokerColorInfo, numberOfEachGroup);
+				if( tempPokerGroupCardInfo != null)
+				{
+					srcCardIDList.addAll(tempPokerGroupCardInfo.srcCardIDList);
+					this.pokerManager.sortCardIDListMaxA(tempPokerGroupCardInfo.showCardIDList, false);
+					showCardIDList.addAll(tempPokerGroupCardInfo.showCardIDList);
+					//移除已经挑出来的牌
+					this.removeCardByIDList(handCardIDList, tempPokerGroupCardInfo.srcCardIDList);
+					break; //挑选到合适的一组，跳出for循环
+				}
+			}
+		}
+		
+		if( showCardIDList.size() == groups * numberOfEachGroup)
+		{
+			pokerGroupCardInfo.srcCardIDList = srcCardIDList;
+			pokerGroupCardInfo.showCardIDList = showCardIDList;
+			return pokerGroupCardInfo;
+		}
+	
+		return null;
+	}
+	public Hashtable<Integer, HandPokerColorInfo> mergePokerByRedOrBlack(Hashtable<Integer, HandPokerColorInfo> color2CardInfo)
+	{
+		Hashtable<Integer, HandPokerColorInfo> tempColor2CardInfo = new Hashtable<>();
+		
+		HandPokerColorInfo tempHandPokerColorInfo1 = new HandPokerColorInfo();
+		tempHandPokerColorInfo1.color = 1;
+		HandPokerColorInfo tempHandPokerColorInfo2 = new HandPokerColorInfo();
+		tempHandPokerColorInfo2.color = 2;
+		for(Iterator<Integer> iterator = color2CardInfo.keySet().iterator(); iterator.hasNext();)
+		{
+			int tempColor = iterator.next();
+			if( tempColor%2 == 1)
+			{
+				tempHandPokerColorInfo1.cardIDList.addAll(color2CardInfo.get(tempColor).cardIDList);
+			}else
+			{
+				tempHandPokerColorInfo2.cardIDList.addAll(color2CardInfo.get(tempColor).cardIDList);
+			}
+		}
+		tempColor2CardInfo.put(1, tempHandPokerColorInfo1);
+		tempColor2CardInfo.put(2, tempHandPokerColorInfo2);
+		
+		if( tempColor2CardInfo != null)
+		{
+			return tempColor2CardInfo;
+		}
+		return null;
+	}
+	//寻找指定数量的相同花色的牌
+	public PokerGroupCardInfo getSameColorPokerGroupInfo(HandPokerColorInfo colorPokerInfo,int findCount )
+	{
+		PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
+		
+		List<Integer> srcCardIDList = new ArrayList<>();
+		List<Integer> showCardIDList = new ArrayList<>();
+		if( colorPokerInfo == null)
+		{
+			return null;
+		}
+		int count = 0;
+		for(int cardID : colorPokerInfo.cardIDList)
+		{
+			if( count < findCount)
+			{
+				srcCardIDList.add(cardID);
+				showCardIDList.add(cardID);
+				count++;
+			}else
+			{
+				break;
+			}
+			
+		}
+		if(showCardIDList.size() == findCount)
+		{
+			pokerGroupCardInfo.srcCardIDList = srcCardIDList;
+			pokerGroupCardInfo.showCardIDList = showCardIDList;
+			return pokerGroupCardInfo;
+		}
+		
+		return null;
+	}
+	public PokerGroupCardInfo getShunZi(List<Integer> handCardIDList,boolean needTongHua)
+	{
+		//排序
+		handCardIDList.sort((first,second) ->
+		{
+			return first%100 -second%100;
+		});
+		//随机选取5张牌
+		Hashtable<Integer, List<Integer>> firstSelected = new Hashtable<>();
+		firstSelected = select5CardID(handCardIDList);
+		
+		for(Iterator<Integer> iterator = firstSelected.keySet().iterator(); iterator.hasNext();)
+		{
+			List<Integer> firstSelectedCardList = firstSelected.get(iterator.next());
+
+			PokerGroupCardInfo firstPokerGroupCardInfo = this.isShunZi(firstSelectedCardList,needTongHua);
+			if( firstPokerGroupCardInfo !=null)
+			{
+				//移除已将凑成顺子的cardID
+				List<Integer> leftHandCardIDList = new ArrayList<>(handCardIDList);
+				this.removeCardByIDList(leftHandCardIDList, firstSelectedCardList);
+				//挑选第二个顺子
+				Hashtable<Integer, List<Integer>> secondSelected = new Hashtable<>();
+				secondSelected = select5CardID(leftHandCardIDList);
+				
+				for (Iterator iterator2 = secondSelected.keySet().iterator(); iterator2.hasNext();) 
+				{
+					List<Integer> secondSelectedCardList = secondSelected.get(iterator2.next());
+					
+					PokerGroupCardInfo secondPokerGroupCardInfo = this.isShunZi(secondSelectedCardList, needTongHua);
+					if (secondPokerGroupCardInfo != null) 
+					{
+						this.removeCardByIDList(leftHandCardIDList, secondSelectedCardList);
+						
+						PokerGroupCardInfo thirdPokerGroupCardInfo = this.isShunZi(leftHandCardIDList, needTongHua);
+						
+						if( thirdPokerGroupCardInfo != null )
+						{
+							PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
+							pokerGroupCardInfo.showCardIDList.addAll(firstPokerGroupCardInfo.showCardIDList);
+							pokerGroupCardInfo.showCardIDList.addAll(secondPokerGroupCardInfo.showCardIDList);
+							pokerGroupCardInfo.showCardIDList.addAll(thirdPokerGroupCardInfo.showCardIDList);
+							
+							return pokerGroupCardInfo;
+						}
+					}
+					
+				}	
+			}
+		}
+		
+		return null;
+	}
+	public Hashtable<Integer, List<Integer> > select5CardID(List<Integer> handCardIDList)
+	{
+		Hashtable<Integer, List<Integer> > selected = new Hashtable<>();	
+		
+		int cardCount = handCardIDList.size();
+		int count = 0;
+		for(int index1 = 0; index1 < cardCount; index1++ )
+		{
+			for(int index2 = index1+1; index2 < cardCount ; index2++)
+			{
+				for(int index3 = index2+1; index3 < cardCount; index3++)
+				{
+					for(int index4 = index3+1; index4 < cardCount; index4++)
+					{
+						for( int index5 = index4+1; index5 < cardCount; index5++)
+						{
+							List<Integer> selectedList = new ArrayList<>();
+							selectedList.add(handCardIDList.get(index1));
+							selectedList.add(handCardIDList.get(index2));
+							selectedList.add(handCardIDList.get(index3));
+							selectedList.add(handCardIDList.get(index4));
+							selectedList.add(handCardIDList.get(index5));
+							selected.put(count++, selectedList);
+						}
+					}
+				}
+			}
+		}
+
+		return selected;
+	}
+	public PokerGroupCardInfo isShunZi(List<Integer> handCardIDList,boolean needTongHua)
+	{
+		if( needTongHua)
+		{
+			HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, new ArrayList<>());
+			Hashtable<Integer, HandPokerColorInfo> color2CardInfo = handPokerInfo.color2CardInfo;
+			if(color2CardInfo.size() != 1)
+			{
+				return null;
+			}			
+		}
+		List<Poker> pokerList = new ArrayList<>();
+		pokerList = this.pokerManager.getPokerList(handCardIDList);
+		
+		pokerList.sort(( first, second) ->
+		{
+			return second.value - first.value;
+		});
+		
+		int pokerCount = pokerList.size();
+		for (int index = 0; index < pokerCount-1; index++) 
+		{
+			int currentValue = pokerList.get(index).value;
+			int nextValue = pokerList.get(index+1).value;
+			if( currentValue - nextValue !=1)
+			{
+				//如果最大牌为K，且比较的牌为A，则仍旧视为顺子，跳过本次比较，否则不是顺子
+				if( pokerList.get(0).value == 13 && nextValue == 1)
+				{
+					continue;
+				}else
+				{
+					return null;
+				}
+			}
+		}
+		PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
+		pokerGroupCardInfo.srcCardIDList = handCardIDList;
+		pokerGroupCardInfo.showCardIDList = handCardIDList;
+		return pokerGroupCardInfo;
+	}
 	//获取顺子的字符串形式  showCardIDList：默认顺序是  A K Q J 10，...2    
 	public String getShunZiSSSDaoStringValue(List<Integer> showCardIDList) {
 
