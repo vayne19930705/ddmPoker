@@ -20,23 +20,23 @@ public class SSSPokerCardUtil extends BaseLog {
 	// 六同
 	public String CardName_LiuTong = "c_a";
 	// 五同 %s为牌的string值
-	public String CardName_WuTong = "c_9_%s";
+	public String CardName_WuTong = "c_9_";
 	// 同花顺
-	public String CardName_TongHuaShun = "c_8_%s";
+	public String CardName_TongHuaShun = "c_8_";
 	// 铁支
-	public String CardName_TieZhi = "c_7_%s";
+	public String CardName_TieZhi = "c_7_";
 	// 葫芦
-	public String CardName_HuLu = "c_6_%s";
+	public String CardName_HuLu = "c_6_";
 	// 同花3条
-	public String CardName_TongHuaSanTiao = "c_5_3_%s";
+	public String CardName_TongHuaSanTiao = "c_5_3_";
 	// 同花2对
-	public String CardName_TongHuaLiangDui = "c_5_2_%s";
+	public String CardName_TongHuaLiangDui = "c_5_2_";
 	// 同花1对
-	public String CardName_TongHuaYiDui = "c_5_1_%s";
+	public String CardName_TongHuaYiDui = "c_5_1_";
 	// 普通同花 %s 为牌的点数
-	public String CardName_TongHua = "c_5_0_%s";
+	public String CardName_TongHua = "c_5_0_";
 	// 顺子
-	public String CardName_ShunZi = "c_4_%s";
+	public String CardName_ShunZi = "c_4_";
 
 	// 3鬼3条
 	public String CardName_SanTiao3Joker = "c_3_3";
@@ -45,14 +45,14 @@ public class SSSPokerCardUtil extends BaseLog {
 	// 1鬼3条 或者 扣牌3条
 	public String CardName_SanTiao1Joker = "c_3_1";
 	// 三条
-	public String CardName_SanTiao = "c_3_%s";
+	public String CardName_SanTiao = "c_3_";
 
 	// 两对
-	public String CardName_LiangDui = "c_2_%s";
+	public String CardName_LiangDui = "c_2_";
 	// 一对
-	public String CardName_YiDui = "c_1_%s";
+	public String CardName_YiDui = "c_1_";
 	// 乌龙 %s 表示总的点数string
-	public String CardName_WuLong = "c_0_%s";
+	public String CardName_WuLong = "c_0_";
 
 	public String CardName_ZhiZunQingLong = "s_19";// 至尊青龙：A—K清一色顺子。
 	public String CardName_YiTiaoLong = "s_18";// 一条龙：A—K顺子。
@@ -107,8 +107,10 @@ public class SSSPokerCardUtil extends BaseLog {
 
 		// 玩家手牌5张
 		List<Integer> handCardIDList = new ArrayList<>(
-				Arrays.asList(101, 201, 301, 105, 106, 107, 108, 109, 500, 103, 203, 303, 403));
-		SSSPointCardInfo cardInfo = this.autoPlacePoker(handCardIDList, allJokerCardIDList);	
+				Arrays.asList(308, 101, 108, 500, 203, 103, 303, 405, 401, 402, 403, 404, 405));
+
+//		SSSPointCardInfo cardInfo = this.autoPlacePoker(handCardIDList, allJokerCardIDList);
+		SSSPointCardInfo cardInfo =  this.getCardInfo(handCardIDList, allJokerCardIDList);
 		this.info(":{} 结果:{},{}", handCardIDList, cardInfo.cardName, cardInfo.endCardIDList);
 
 		}
@@ -243,7 +245,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		this.pokerManager.sortCardIDListMaxA(showCardIDList, false);
 		stringValue = getPokerStringValue(showCardIDList);
 
-		cardName = String.format(CardName_WuLong, stringValue);
+		cardName = CardName_WuLong + stringValue;
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = srcCardIDList;
 		daoCardInfo.showCardIDList = showCardIDList;
@@ -264,7 +266,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		List<Integer> leftPokerIDList = new ArrayList<>(cardIDList);
 		List<Integer> showCardIDList = new ArrayList<>();
 
-		PokerGroupCardInfo pokerGroupCardInfo = getSameMaxIDList(value2CardInfo, handJokerCardIDList, 2, true);
+		PokerGroupCardInfo pokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 1, 2, true);
 
 		if (pokerGroupCardInfo == null) {
 			return null;
@@ -276,7 +278,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		showCardIDList.addAll(leftPokerIDList);
 
 		stringValue = getPokerStringValue(showCardIDList);
-		cardName = String.format(CardName_YiDui, stringValue);
+		cardName = CardName_YiDui+stringValue;
 
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = cardIDList;
@@ -292,32 +294,21 @@ public class SSSPokerCardUtil extends BaseLog {
 		String cardName = "";
 		String stringValue = new String();
 		List<Integer> leftPokerIDList = new ArrayList<>(cardIDList);
-		List<Integer> leftJokerIDList = new ArrayList<>(handJokerCardIDList);
 		List<Integer> showCardIDList = new ArrayList<>();
 
-		PokerGroupCardInfo firstPokerGroupCardInfo = getSameMaxIDList(value2CardInfo, leftJokerIDList, 2, true);
-		if (firstPokerGroupCardInfo == null) {
+		PokerGroupCardInfo pokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 2, 2, true);
+		if (pokerGroupCardInfo == null) {
 			return null;
 		}
-		showCardIDList.addAll(firstPokerGroupCardInfo.showCardIDList);
+		showCardIDList.addAll(pokerGroupCardInfo.showCardIDList);
 
-		this.removeCardByIDList(leftPokerIDList, firstPokerGroupCardInfo.showCardIDList);
-		this.removeCardByIDList(leftJokerIDList, firstPokerGroupCardInfo.srcCardIDList);
-
-		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(leftPokerIDList, allJokerIDList);
-		PokerGroupCardInfo secondPokerGroupInfo = getSameMaxIDList(handPokerInfo.value2CardInfo, leftJokerIDList, 2,
-				true);
-		if (secondPokerGroupInfo == null) {
-			return null;
-		}
-
-		showCardIDList.addAll(secondPokerGroupInfo.showCardIDList);
-		this.removeCardByIDList(leftPokerIDList, secondPokerGroupInfo.srcCardIDList);
-
+		this.removeCardByIDList(leftPokerIDList, pokerGroupCardInfo.showCardIDList);
+		
 		showCardIDList.addAll(leftPokerIDList);
+		
 		stringValue = getPokerStringValue(showCardIDList);
-		cardName = String.format(CardName_LiangDui, stringValue);
-
+		cardName = CardName_LiangDui + stringValue;
+		
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = cardIDList;
 		daoCardInfo.showCardIDList = showCardIDList;
@@ -335,22 +326,21 @@ public class SSSPokerCardUtil extends BaseLog {
 		List<Integer> showCardIDList = new ArrayList<>();
 
 		List<Integer> leftPokerIDList = new ArrayList<>(cardIDList);
-		List<Integer> leftJokerIDList = new ArrayList<>(handJokerCardIDList);
-
-		PokerGroupCardInfo pokerGroupCardInfo = getSameMaxIDList(value2CardInfo, leftJokerIDList, 3, true);
+		
+		PokerGroupCardInfo pokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 1, 3, true);
 		if (pokerGroupCardInfo == null) {
 			return null;
 		}
-		this.removeCardByIDList(leftPokerIDList, pokerGroupCardInfo.srcCardIDList);
-		this.removeCardByIDList(leftJokerIDList, pokerGroupCardInfo.srcCardIDList);
 		showCardIDList.addAll(pokerGroupCardInfo.showCardIDList);
+		this.removeCardByIDList(leftPokerIDList, pokerGroupCardInfo.srcCardIDList);
+		
 		// 加入剩余的2张牌
 		if (leftPokerIDList.size() != 0) {
 			this.pokerManager.sortCardIDListMaxA(leftPokerIDList, false);
 			showCardIDList.addAll(leftPokerIDList);
 		}
 		stringValue = getPokerStringValue(showCardIDList);
-		cardName = String.format(CardName_SanTiao, stringValue);
+		cardName = CardName_SanTiao + stringValue;
 
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = cardIDList;
@@ -433,7 +423,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		} else {
 			tempString = "0" + stringValue.substring(4);
 		}
-		cardName = String.format(CardName_ShunZi, tempString);
+		cardName = CardName_ShunZi + tempString;
 
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = cardIDList;
@@ -457,7 +447,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		daoCardInfo = c_3_SanTiao(cardIDList, value2CardInfo, handJokerCardIDList);
 		if (daoCardInfo != null) {
 			stringValue = daoCardInfo.cardName.substring(4);
-			cardName = String.format(CardName_TongHuaSanTiao, stringValue);
+			cardName = CardName_TongHuaSanTiao + stringValue;
 			daoCardInfo.cardName = cardName;
 			return daoCardInfo;
 		}
@@ -465,7 +455,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		daoCardInfo = c_2_LiangDui(cardIDList, value2CardInfo, handJokerCardIDList, allJokerIDList);
 		if (daoCardInfo != null) {
 			stringValue = daoCardInfo.cardName.substring(4);
-			cardName = String.format(CardName_TongHuaLiangDui, stringValue);
+			cardName = CardName_TongHuaLiangDui + stringValue;
 			daoCardInfo.cardName = cardName;
 			return daoCardInfo;
 		}
@@ -473,7 +463,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		daoCardInfo = c_1_YiDui(cardIDList, value2CardInfo, handJokerCardIDList);
 		if (daoCardInfo != null) {
 			stringValue = daoCardInfo.cardName.substring(4);
-			cardName = String.format(CardName_TongHuaYiDui, stringValue);
+			cardName = CardName_TongHuaYiDui + stringValue;
 			daoCardInfo.cardName = cardName;
 			return daoCardInfo;
 		}
@@ -481,7 +471,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		showCardIDList = new ArrayList<>(cardIDList);
 		this.pokerManager.sortCardIDListMaxA(showCardIDList, false);
 		stringValue = getPokerStringValue(showCardIDList);
-		cardName = String.format(CardName_TongHua, stringValue);
+		cardName = CardName_TongHua + stringValue;
 
 		daoCardInfo = new SSSDaoCardInfo();
 		daoCardInfo.cardName = cardName;
@@ -500,25 +490,22 @@ public class SSSPokerCardUtil extends BaseLog {
 		String stringValue = new String();
 
 		List<Integer> leftPokerIDList = new ArrayList<>(cardIDList);
-		List<Integer> leftJokerIDList = new ArrayList<>(handJokerCardIDList);
-		PokerGroupCardInfo firstPokerGroupCardInfo = getSameMaxIDList(value2CardInfo, leftJokerIDList, 3, true);
+		List<Integer> showCardIDList = new ArrayList<>();
+		
+		PokerGroupCardInfo firstPokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 1, 3, true);
 		if (firstPokerGroupCardInfo == null) {
 			return null;
 		}
+		showCardIDList.addAll(firstPokerGroupCardInfo.showCardIDList);
 		this.removeCardByIDList(leftPokerIDList, firstPokerGroupCardInfo.srcCardIDList);
-		this.removeCardByIDList(leftJokerIDList, firstPokerGroupCardInfo.srcCardIDList);
 
-		List<Integer> showCardIDList = firstPokerGroupCardInfo.showCardIDList;
-
-		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(leftPokerIDList, allJokerIDList);
-		PokerGroupCardInfo secondPokerGroupCardInfo = getSameMaxIDList(handPokerInfo.value2CardInfo, leftJokerIDList, 2,
-				true);
+		PokerGroupCardInfo secondPokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 1, 2, true);
 		if (secondPokerGroupCardInfo == null) {
 			return null;
 		}
 		showCardIDList.addAll(secondPokerGroupCardInfo.showCardIDList);
 		stringValue = getPokerStringValue(showCardIDList);
-		cardName = String.format(CardName_HuLu, stringValue);
+		cardName = CardName_HuLu + stringValue;
 
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = cardIDList;
@@ -533,24 +520,24 @@ public class SSSPokerCardUtil extends BaseLog {
 
 		String cardName = "";
 		String stringValue = new String();
+		
 		List<Integer> leftPokerIDList = new ArrayList<>(cardIDList);
-		List<Integer> leftJokerIDList = new ArrayList<>(handJokerCardIDList);
-
-		PokerGroupCardInfo pokerGroupCardInfo = getSameMaxIDList(value2CardInfo, leftJokerIDList, 4, true);
+		List<Integer> showCardIDList = new ArrayList<>();
+		PokerGroupCardInfo pokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 1, 4, true);
 		if (pokerGroupCardInfo == null) {
 			return null;
 		}
+		showCardIDList.addAll(pokerGroupCardInfo.showCardIDList);
 		this.removeCardByIDList(leftPokerIDList, pokerGroupCardInfo.srcCardIDList);
-		this.removeCardByIDList(leftJokerIDList, pokerGroupCardInfo.srcCardIDList);
 		// 添加剩余的一张牌
-		pokerGroupCardInfo.srcCardIDList.addAll(leftPokerIDList);
-		pokerGroupCardInfo.showCardIDList.addAll(leftPokerIDList);
+		showCardIDList.addAll(leftPokerIDList);
 
-		stringValue = getPokerStringValue(pokerGroupCardInfo.showCardIDList);
-		cardName = String.format(CardName_TieZhi, stringValue);
+		stringValue = getPokerStringValue(showCardIDList);
+		cardName = CardName_TieZhi + stringValue;
+		
 		daoCardInfo.cardName = cardName;
-		daoCardInfo.srcCardIDList = pokerGroupCardInfo.srcCardIDList;
-		daoCardInfo.showCardIDList = pokerGroupCardInfo.showCardIDList;
+		daoCardInfo.srcCardIDList = cardIDList;
+		daoCardInfo.showCardIDList = showCardIDList;
 
 		return daoCardInfo;
 	}
@@ -559,11 +546,11 @@ public class SSSPokerCardUtil extends BaseLog {
 	public SSSDaoCardInfo c_8_TongHuaShun(List<Integer> cardIDList,
 			Hashtable<Integer, HandPokerColorInfo> color2CardInfo,
 			Hashtable<Integer, HandPokerValueInfo> value2CardInfo, List<Integer> handJokerCardIDList) {
+		
 		SSSDaoCardInfo daoCardInfo = new SSSDaoCardInfo();
 
 		String cardName = "";
 		String stringValue = new String();
-		List<Integer> showCardIDList = new ArrayList<>();
 
 		// 超过一种花色 || 出现相同大小的牌 ，不是同花顺
 		if (color2CardInfo.size() > 1 || value2CardInfo.size() + handJokerCardIDList.size() < 5) {
@@ -572,7 +559,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		daoCardInfo = c_4_ShunZi(cardIDList, value2CardInfo, handJokerCardIDList);
 		if (daoCardInfo != null) {
 			stringValue = daoCardInfo.cardName.substring(4);
-			cardName = String.format(CardName_TongHuaShun, stringValue);
+			cardName = CardName_TongHuaShun + stringValue;
 			daoCardInfo.cardName = cardName;
 			return daoCardInfo;
 		} else {
@@ -587,53 +574,18 @@ public class SSSPokerCardUtil extends BaseLog {
 
 		String cardName = "";
 		String stringValue = new String();
-
-		PokerGroupCardInfo pokerGroupCardInfo = getSameMaxIDList(value2CardInfo, handJokerCardIDList, 5, true);
+		
+		List<Integer> leftPokerIDList = new ArrayList<>(cardIDList);
+		PokerGroupCardInfo pokerGroupCardInfo = getMaxSameValueIDList(leftPokerIDList, 1, 5, true);
 		if (pokerGroupCardInfo == null) {
 			return null;
 		}
 		stringValue = getPokerStringValue(pokerGroupCardInfo.showCardIDList);
-		cardName = String.format(CardName_WuTong, stringValue);
+		cardName = CardName_WuTong + stringValue;
 		daoCardInfo.cardName = cardName;
 		daoCardInfo.srcCardIDList = cardIDList;
 		daoCardInfo.showCardIDList = pokerGroupCardInfo.showCardIDList;
 		return daoCardInfo;
-	}
-
-	/**
-	 * @param value2CardInfo
-	 * @param handJokerCardIDList
-	 * @param findCardCount
-	 * @param isFindMax
-	 * @return
-	 */
-	public PokerGroupCardInfo getSameMaxIDList(Hashtable<Integer, HandPokerValueInfo> value2CardInfo,
-			List<Integer> handJokerCardIDList, int findCardCount, boolean isFindMax) {
-		List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
-		int count = valueList.size();
-		if (count == 0) {
-			return null;
-		}
-
-		this.pokerManager.sortCardValueList(valueList);
-
-		// 如果是找最小的,倒序
-		if (!isFindMax) {
-			Collections.reverse(valueList);
-		}
-		PokerGroupCardInfo groupCardInfo = null;
-
-		// 从大到小查询满足条件的id列表 A最大
-		for (int index = 0; index < count; index++) {
-			int value = valueList.get(index);
-			HandPokerValueInfo valuePokerInfo = value2CardInfo.get(value);
-			groupCardInfo = this.getSameValuePokerGroupCardInfo(valuePokerInfo, handJokerCardIDList, findCardCount);
-			if (groupCardInfo != null) {
-				return groupCardInfo;
-			}
-		}
-
-		return null;
 	}
 
 	// 查找指定数量的 相同value的 卡牌信息
@@ -830,9 +782,9 @@ public class SSSPokerCardUtil extends BaseLog {
 			this.error("getSpecailCardInfo cardIDList:{} not 13 length", handCardIDList);
 			return null;
 		}
-
+	
 		HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(handCardIDList, allJokerIDList);
-
+		
 		Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
 		Hashtable<Integer, HandPokerColorInfo> color2CardInfo = handPokerInfo.color2CardInfo;
 		List<Integer> handJokerCardIDList = handPokerInfo.handJokerCardIDList;
@@ -841,7 +793,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		if (handJokerCardIDList.size() > 0) {
 			return null;
 		}
-
+		
 		SSSSpecailCardInfo specailCardInfo = this.getSpecailCardName(100, handCardIDList, color2CardInfo,
 				value2CardInfo);
 
@@ -987,7 +939,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		List<Integer> showCardIDList = new ArrayList<>();
 		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
 
-		PokerGroupCardInfo pokerGroupCardInfo = this.getShunZi(leftHandCardIDList, true);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getSanShunZi(leftHandCardIDList, true);
 
 		if (pokerGroupCardInfo != null) {
 			Collections.reverse(showCardIDList);
@@ -1209,7 +1161,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		List<Integer> showCardIDList = new ArrayList<>();
 		List<Integer> leftHandCardIDList = new ArrayList<>(cardIDList);
 
-		PokerGroupCardInfo pokerGroupCardInfo = this.getShunZi(leftHandCardIDList, false);
+		PokerGroupCardInfo pokerGroupCardInfo = this.getSanShunZi(leftHandCardIDList, false);
 
 		if (pokerGroupCardInfo != null) {
 			Collections.reverse(showCardIDList);
@@ -1315,8 +1267,8 @@ public class SSSPokerCardUtil extends BaseLog {
 		return sssSpecailCardInfo;
 	}
 
-	public PokerGroupCardInfo getMaxSameValueIDList(List<Integer> handCardIDList, int groups, int numberOfEachGroup,
-			boolean isFindMax) {
+	public PokerGroupCardInfo getMaxSameValueIDList(List<Integer> handCardIDList,
+			int groups, int numberOfEachGroup,boolean isFindMax) {
 		PokerGroupCardInfo pokerGroupCardInfo = new PokerGroupCardInfo();
 
 		List<Integer> srcCardIDList = new ArrayList<>();
@@ -1325,10 +1277,13 @@ public class SSSPokerCardUtil extends BaseLog {
 		List<Integer> leftCardIDList = new ArrayList<>(handCardIDList);
 		// 寻找groups组，每组numberOfEachGroup张牌
 		for (int group = 0; group < groups; group++) {
-			HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(leftCardIDList, new ArrayList<>());
+			
+			HandPokerInfo handPokerInfo = this.pokerManager.getHandInfo(leftCardIDList, allJokerCardIDList);
 			Hashtable<Integer, HandPokerValueInfo> value2CardInfo = handPokerInfo.value2CardInfo;
-
+			
+			List<Integer> leftHandJokerCardIDList = handPokerInfo.handJokerCardIDList;
 			List<Integer> valueList = new ArrayList<>(value2CardInfo.keySet());
+			
 			int valueCount = valueList.size();
 			if (valueCount == 0) {
 				return null;
@@ -1344,7 +1299,7 @@ public class SSSPokerCardUtil extends BaseLog {
 				int value = valueList.get(index);
 				HandPokerValueInfo handPokerValueInfo = value2CardInfo.get(value);
 				PokerGroupCardInfo tempPokerGroupCardInfo = this.getSameValuePokerGroupCardInfo(handPokerValueInfo,
-						new ArrayList<>(), numberOfEachGroup);
+						leftHandJokerCardIDList, numberOfEachGroup);
 
 				if (tempPokerGroupCardInfo != null) {
 					srcCardIDList.addAll(tempPokerGroupCardInfo.srcCardIDList);
@@ -1353,6 +1308,7 @@ public class SSSPokerCardUtil extends BaseLog {
 					// false);
 					// 移除已经挑出来的牌
 					this.removeCardByIDList(leftCardIDList, tempPokerGroupCardInfo.srcCardIDList);
+					this.removeCardByIDList(leftHandJokerCardIDList, tempPokerGroupCardInfo.srcCardIDList);
 					break; // 挑选到合适的一组，跳出for循环
 				}
 			}
@@ -1525,7 +1481,7 @@ public class SSSPokerCardUtil extends BaseLog {
 		return null;
 	}
 
-	public PokerGroupCardInfo getShunZi(List<Integer> handCardIDList, boolean needTongHua) {
+	public PokerGroupCardInfo getSanShunZi(List<Integer> handCardIDList, boolean needTongHua) {
 		// 排序
 		handCardIDList.sort((first, second) -> {
 			return first % 100 - second % 100;
@@ -1650,7 +1606,6 @@ public class SSSPokerCardUtil extends BaseLog {
 		SSSDaoCardInfo middleDaoCardInfo = new SSSDaoCardInfo();
 		SSSDaoCardInfo headDaoCardInfo = new SSSDaoCardInfo();
 		
-		
 		Hashtable<Integer, List<Integer>> tailSelectedSequence = this.select5CardID(handCardIDList);
 		for (Iterator<Integer> iterator = tailSelectedSequence.keySet().iterator(); iterator.hasNext();) {
 			List<Integer> tailSelectedIDList = tailSelectedSequence.get(iterator.next());
@@ -1692,42 +1647,5 @@ public class SSSPokerCardUtil extends BaseLog {
 		cardInfo.endCardIDList.addAll(tailDaoCardInfo.showCardIDList);
 		
 		return cardInfo;
-	}
-
-	// 获取顺子的字符串形式 showCardIDList：默认顺序是 A K Q J 10，...2
-	public String getShunZiSSSDaoStringValue(List<Integer> showCardIDList) {
-
-		List<Integer> tempShowIDList = new ArrayList<>(showCardIDList);
-
-		int lastCardID = tempShowIDList.get(showCardIDList.size() - 1);
-		Poker lastPoker = this.pokerManager.getPokerByCardID(lastCardID);
-
-		// 如果是5,4,3,2,1 是第2大,把1放到第一位
-		if (lastPoker.value == 1) {
-			tempShowIDList.remove(showCardIDList.size() - 1);
-			tempShowIDList.add(0, lastCardID);
-		}
-
-		return this.getSSSDaoStringValue(tempShowIDList);
-	}
-
-	// 获取某到牌的 字符串形式
-	// cardIDList:指定牌组,排序过的牌
-
-	public String getSSSDaoStringValue(List<Integer> cardIDList) {
-		String ret = "";
-		int count = cardIDList.size();
-		for (int index = 0; index < count; index++) {
-			int cardID = cardIDList.get(index);
-
-			// 如果传递0 是移除2,3,4,5后山寨替换的一张cardID
-			if (cardID == 0) {
-				ret += "0";
-				continue;
-			}
-			Poker poker = this.pokerManager.getPokerByCardID(cardID);
-			ret += poker.getStringValue();
-		}
-		return ret;
-	}
+	}		
 }
